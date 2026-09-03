@@ -14,7 +14,7 @@ import {
 } from '$lib/server/db/queries';
 import { ALL_KINDS, buildCalibrationTable } from '$lib/scheduler/calibration';
 import { replan } from '$lib/server/planner';
-import { ensureRecurringAdmin, projectEconomics, upcomingAdmin } from '$lib/server/freelance';
+import { ensureRecurringAdmin, upcomingAdmin } from '$lib/server/freelance';
 import { pushConfigured } from '$lib/server/notify';
 import type { TaskKind, WorkingHours } from '$lib/scheduler/types';
 import type { Actions, PageServerLoad } from './$types';
@@ -32,7 +32,6 @@ export const load: PageServerLoad = async (event) => {
 	const table = buildCalibrationTable(samples);
 	const byDay = new Map(workingHours.map((h) => [h.dayOfWeek, h]));
 	const timezone = settings?.timezone ?? 'Europe/Paris';
-	const economics = await projectEconomics(user.id);
 
 	return {
 		settings: {
@@ -48,7 +47,6 @@ export const load: PageServerLoad = async (event) => {
 			intervals: byDay.get(dayOfWeek)?.intervals ?? []
 		})),
 		pushAvailable: pushConfigured(),
-		economics,
 		upcomingAdmin: upcomingAdmin(new Date(), timezone).map((item) => ({
 			title: item.title,
 			deadline: item.deadline,

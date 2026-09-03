@@ -49,3 +49,28 @@ describe('isSupportedCurrency', () => {
 		expect(isSupportedCurrency('BTC')).toBe(false);
 	});
 });
+
+describe('the rate a project reports', () => {
+	// Regression: the settings page showed "30000€" for a fee of 30 000 JPY,
+	// because currency conversion lived in the projects page rather than in
+	// projectEconomics. Two places computing the same number diverged the moment
+	// one of them changed. These pin the arithmetic that both now share.
+	const round = (n: number) => Math.round(n * 100) / 100;
+
+	it('divides the EURO fee by the hours, not the foreign one', () => {
+		const feeEur = toEur(30_000, 0.00541, 'JPY');
+		expect(feeEur).toBe(162.3);
+
+		// 162.30 € over 10 hours is 16.23 €/h — a sixth of the French minimum
+		// wage, and exactly the kind of thing this table exists to reveal.
+		expect(round(feeEur! / 10)).toBe(16.23);
+		// The bug reported 3000 €/h for the same job.
+		expect(round(30_000 / 10)).toBe(3000);
+	});
+
+	it('reports no rate at all rather than a wrong one', () => {
+		// A foreign fee with no exchange rate must not fall back to treating the
+		// number as euros.
+		expect(toEur(30_000, null, 'JPY')).toBeNull();
+	});
+});

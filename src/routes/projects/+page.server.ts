@@ -11,7 +11,7 @@ import { db, schema } from '$lib/server/db';
 import { requireUser } from '$lib/server/auth';
 import { createProject, getSettings, updateProject } from '$lib/server/db/queries';
 import { projectEconomics } from '$lib/server/freelance';
-import { CURRENCIES, formatMoney, isSupportedCurrency, rateToEur, toEur } from '$lib/server/fx';
+import { CURRENCIES, isSupportedCurrency, rateToEur } from '$lib/server/fx';
 import { replan } from '$lib/server/planner';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -28,35 +28,15 @@ export const load: PageServerLoad = async (event) => {
 	return {
 		currencies: CURRENCIES,
 		timezone: settings?.timezone ?? 'Europe/Paris',
+		// Everything money-related comes from projectEconomics, which is the one
+		// place currency conversion happens. Only presentation fields are added.
 		projects: economics.map((project) => {
 			const row = byId.get(project.projectId);
-			const currency = row?.currency ?? 'EUR';
-			const rate = row?.fxRateToEur ?? null;
-
-			const feeEur = toEur(project.agreedFee, rate, currency);
-			const effectiveEur =
-				feeEur !== null && project.actualHours > 0
-					? Math.round((feeEur / project.actualHours) * 100) / 100
-					: null;
-			const projectedEur =
-				feeEur !== null && project.actualHours + project.plannedHours > 0
-					? Math.round((feeEur / (project.actualHours + project.plannedHours)) * 100) / 100
-					: null;
-
 			return {
 				...project,
 				status: row?.status ?? 'active',
 				deadline: row?.deadline ?? null,
-				color: row?.color ?? '#6366f1',
-				currency,
-				fxRateToEur: rate,
-				fxRateAt: row?.fxRateAt ?? null,
-				feeFormatted: project.agreedFee !== null ? formatMoney(project.agreedFee, currency) : null,
-				feeEur,
-				// The rates in §12 are "effective hourly rate", and for a French
-				// auto-entrepreneur that only means anything in euros.
-				effectiveRateEur: effectiveEur,
-				projectedRateEur: projectedEur
+				color: row?.color ?? '#6366f1'
 			};
 		})
 	};

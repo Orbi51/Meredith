@@ -11,25 +11,38 @@ import { db, schema } from './db';
 import { addCivilDays, wallClockToInstant } from '$lib/scheduler/intervals';
 import { formatInTimeZone } from 'date-fns-tz';
 import type { ProjectRow } from './db/queries';
+import { formatMoney, toEur } from './fx';
 
 export type ProjectEconomics = {
 	projectId: string;
 	name: string;
 	clientName: string | null;
+	/** The fee as agreed, in the project's own currency. */
 	agreedFee: number | null;
+	currency: string;
+	/** "500 000 JPY" — the fee written the way that currency is written. */
+	feeFormatted: string | null;
+	fxRateToEur: number | null;
+	fxRateAt: string | null;
+	/** The fee in euros. Null when a rate has not been set for a foreign fee. */
+	feeEur: number | null;
 	agreedHours: number | null;
 	/** Hours actually worked: confirmed blocks, using their recorded actuals. */
 	actualHours: number;
 	/** Hours still planned but not yet worked. */
 	plannedHours: number;
-	/** agreedFee ÷ actual hours. The number that says yes or no to the next job. */
-	effectiveRate: number | null;
+	/**
+	 * Fee ÷ actual hours, IN EUROS. Always euros: comparing 5 000 JPY/h against
+	 * 60 EUR/h would be worse than showing nothing, and euros are the money the
+	 * work is actually banked in.
+	 */
+	effectiveRateEur: number | null;
 	/**
 	 * The rate if every remaining planned hour is also spent. Lower than
-	 * `effectiveRate` while work is outstanding — this is the honest one to
+	 * `effectiveRateEur` while work is outstanding — this is the honest one to
 	 * quote yourself when deciding whether to take similar work again.
 	 */
-	projectedRate: number | null;
+	projectedRateEur: number | null;
 	/** Actual hours over agreed hours, when both are known. */
 	overrunHours: number | null;
 };
@@ -76,26 +89,36 @@ export async function projectEconomics(userId: string): Promise<ProjectEconomics
 			const plannedHours = round(planned.get(project.id) ?? 0);
 			const fee = project.agreedFee;
 
+			// Convert ONCE, here, and let every screen read the result. Doing this
+			// per page is how the settings table came to show a JPY fee with a
+			// euro sign on it.
+			const feeEur = toEur(fee, project.fxRateToEur, project.currency);
+
 			return {
 				projectId: project.id,
 				name: project.name,
 				clientName: project.clientName,
 				agreedFee: fee,
+				currency: project.currency,
+				feeFormatted: fee !== null ? formatMoney(fee, project.currency) : null,
+				fxRateToEur: project.fxRateToEur,
+				fxRateAt: project.fxRateAt,
+				feeEur,
 				agreedHours: project.agreedHours,
 				actualHours,
 				plannedHours,
 				// Dividing by zero hours would report an infinite rate on a project
 				// nobody has worked yet, which is worse than saying nothing.
-				effectiveRate: fee !== null && actualHours > 0 ? round(fee / actualHours) : null,
-				projectedRate:
-					fee !== null && actualHours + plannedHours > 0
-						? round(fee / (actualHours + plannedHours))
+				effectiveRateEur: feeEur !== null && actualHours > 0 ? round(feeEur / actualHours) : null,
+				projectedRateEur:
+					feeEur !== null && actualHours + plannedHours > 0
+						? round(feeEur / (actualHours + plannedHours))
 						: null,
 				overrunHours:
 					project.agreedHours !== null ? round(actualHours - project.agreedHours) : null
 			};
 		})
-		.sort((a, b) => (a.effectiveRate ?? Infinity) - (b.effectiveRate ?? Infinity));
+		.sort((a, b) => (a.effectiveRateEur ?? Infinity) - (b.effectiveRateEur ?? Infinity));
 }
 
 /**

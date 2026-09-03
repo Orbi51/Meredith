@@ -201,51 +201,10 @@
 <section class="mt-10">
 	<h2 class="font-medium">What your time is worth</h2>
 	<p class="mt-1 max-w-2xl text-sm text-neutral-600">
-		Agreed fee divided by the hours actually confirmed. The projected rate assumes every planned
-		hour is also spent — that is the honest number when deciding whether to take similar work
-		again.
+		Effective and projected hourly rates, in euros whatever the fee was agreed in, live on
+		<a class="underline" href="/projects">the projects page</a> — next to the fee and currency
+		they are calculated from. Keeping one table rather than two is why the numbers agree.
 	</p>
-
-	{#if data.economics.length === 0}
-		<p class="mt-2 text-sm text-neutral-500">No projects yet.</p>
-	{:else}
-		<table class="mt-3 text-sm">
-			<thead class="text-left text-xs text-neutral-500">
-				<tr>
-					<th class="py-1 pr-6">Project</th>
-					<th class="pr-6">Fee</th>
-					<th class="pr-6">Worked</th>
-					<th class="pr-6">Still planned</th>
-					<th class="pr-6">Effective</th>
-					<th>Projected</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each data.economics as row (row.projectId)}
-					<tr class="border-t border-neutral-100">
-						<td class="py-1.5 pr-6">
-							{row.name}
-							{#if row.clientName}
-								<span class="text-xs text-neutral-400">{row.clientName}</span>
-							{/if}
-						</td>
-						<td class="pr-6">{row.agreedFee !== null ? row.agreedFee + '€' : '—'}</td>
-						<td class="pr-6">{row.actualHours}h</td>
-						<td class="pr-6">{row.plannedHours}h</td>
-						<td class="pr-6">
-							{row.effectiveRate !== null ? row.effectiveRate + '€/h' : '—'}
-						</td>
-						<td>
-							{row.projectedRate !== null ? row.projectedRate + '€/h' : '—'}
-						</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-		<p class="mt-2 text-xs text-neutral-500">
-			A rate appears once a project has an agreed fee and at least one confirmed block.
-		</p>
-	{/if}
 </section>
 
 <section class="mt-10 mb-16">
