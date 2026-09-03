@@ -21,8 +21,56 @@
 import type { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
 
-/** The list drained on each run. Google's default list is called this. */
-export const DEFAULT_LIST_TITLE = 'My Tasks';
+/**
+ * The app's own list. It reads and writes NOTHING else.
+ *
+ * The same rule as the calendar: your other lists — "Work", "My Tasks",
+ * whatever the shopping is on — are yours. Draining them would swallow
+ * personal items into the plan and mark them completed, which is not a
+ * mistake you could undo by hand.
+ */
+export const INBOX_LIST_TITLE = 'Meredith inbox';
+
+/** Guard: refuse to touch a list that is not ours. */
+export class ForbiddenTaskListError extends Error {
+	constructor(listId: string) {
+		super(`Refusing to touch task list ${listId}: the app only uses its own.`);
+		this.name = 'ForbiddenTaskListError';
+	}
+}
+
+function assertOwnList(listId: string, ownListId: string | null) {
+	if (!ownListId || listId !== ownListId) throw new ForbiddenTaskListError(listId);
+}
+
+/**
+ * Find the app's list, creating it on first use. Mirrors
+ * `ensureTargetCalendar` — the app brings its own surface rather than
+ * borrowing one of yours.
+ */
+export async function ensureInboxList(
+	auth: OAuth2Client,
+	knownListId: string | null
+): Promise<string> {
+	const tasks = api(auth);
+
+	if (knownListId) {
+		try {
+			const existing = await tasks.tasklists.get({ tasklist: knownListId });
+			if (existing.data.id) return existing.data.id;
+		} catch {
+			// Deleted from the phone: fall through and make a new one.
+		}
+	}
+
+	const lists = await tasks.tasklists.list({ maxResults: 100 });
+	const found = (lists.data.items ?? []).find((list) => list.title === INBOX_LIST_TITLE);
+	if (found?.id) return found.id;
+
+	const created = await tasks.tasklists.insert({ requestBody: { title: INBOX_LIST_TITLE } });
+	if (!created.data.id) throw new Error('Google did not return a task list id.');
+	return created.data.id;
+}
 
 export type CapturedFromPhone = {
 	/** Google's task id, used to complete it once imported. */
@@ -60,36 +108,22 @@ export function isMissingTasksScope(error: unknown): boolean {
  */
 export async function readPhoneCaptures(
 	auth: OAuth2Client,
-	options: { listTitle?: string | null } = {}
+	inboxListId: string
 ): Promise<CapturedFromPhone[]> {
 	const tasks = api(auth);
-	const lists = await tasks.tasklists.list({ maxResults: 100 });
-
-	const wanted = (lists.data.items ?? []).filter((list) => {
-		if (!list.id) return false;
-		// No title configured: drain every list, which is what someone who has
-		// never thought about Google Tasks lists would expect.
-		if (!options.listTitle) return true;
-		return list.title === options.listTitle;
-	});
-
 	const captures: CapturedFromPhone[] = [];
 
-	const responses = await Promise.all(
-		wanted.map((list) =>
-			tasks.tasks
-				.list({
-					tasklist: list.id as string,
-					showCompleted: false,
-					showDeleted: false,
-					showHidden: false,
-					maxResults: 100
-				})
-				.then((response) => ({ listId: list.id as string, items: response.data.items ?? [] }))
-		)
-	);
+	const response = await tasks.tasks.list({
+		tasklist: inboxListId,
+		showCompleted: false,
+		showDeleted: false,
+		showHidden: false,
+		maxResults: 100
+	});
 
-	for (const { listId, items } of responses) {
+	{
+		const listId = inboxListId;
+		const items = response.data.items ?? [];
 		for (const item of items) {
 			if (!item.id || !item.title?.trim()) continue;
 			if (item.status === 'completed') continue;
@@ -126,8 +160,10 @@ const APP_MARKER = '[capacity]';
 export async function markCaptureTaken(
 	auth: OAuth2Client,
 	capture: CapturedFromPhone,
-	scheduledFor: string | null
+	scheduledFor: string | null,
+	ownListId: string | null
 ): Promise<void> {
+	assertOwnList(capture.listId, ownListId);
 	await api(auth).tasks.patch({
 		tasklist: capture.listId,
 		task: capture.id,
@@ -152,15 +188,13 @@ export async function markCaptureTaken(
  */
 export async function writeDailyBriefTask(
 	auth: OAuth2Client,
-	options: { listId?: string | null; title: string; day: string }
+	options: { listId: string; ownListId: string | null; title: string; day: string }
 ): Promise<void> {
+	// No "first list I can find" fallback: that would write the brief into the
+	// user's own shopping list.
+	assertOwnList(options.listId, options.ownListId);
 	const tasks = api(auth);
-
-	const listId =
-		options.listId ??
-		(await tasks.tasklists.list({ maxResults: 1 })).data.items?.[0]?.id ??
-		null;
-	if (!listId) return;
+	const listId = options.listId;
 
 	// Clear the previous brief so there is only ever one.
 	const existing = await tasks.tasks.list({

@@ -132,7 +132,15 @@ export async function replan(userId: string, options: ReplanOptions = {}): Promi
 			// Drain the phone's inbox BEFORE scheduling, so anything captured
 			// away from the machine is planned on this very run rather than
 			// waiting for the next one.
-			const inbox = await drainPhoneInbox(userId, auth, settings.timezone);
+			const inbox = await drainPhoneInbox(
+				userId,
+				auth,
+				settings.timezone,
+				settings.tasksListId
+			);
+			if (inbox.listId && inbox.listId !== settings.tasksListId) {
+				await updateSettings(userId, { tasksListId: inbox.listId });
+			}
 			phoneInbox = {
 				imported: inbox.imported,
 				titles: inbox.titles,

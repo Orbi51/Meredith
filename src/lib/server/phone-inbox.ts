@@ -13,7 +13,12 @@
 import type { OAuth2Client } from 'google-auth-library';
 import { createTask, listProjects } from './db/queries';
 import { parseQuickAdd } from './parse';
-import { isMissingTasksScope, markCaptureTaken, readPhoneCaptures } from './google/tasks';
+import {
+	ensureInboxList,
+	isMissingTasksScope,
+	markCaptureTaken,
+	readPhoneCaptures
+} from './google/tasks';
 import { DEFAULT_MIN_BLOCK_MINUTES } from '$lib/scheduler/types';
 import { formatInTimeZone } from 'date-fns-tz';
 
@@ -22,24 +27,34 @@ export type InboxResult = {
 	titles: string[];
 	/** Set when the user has not granted the Tasks scope yet. */
 	needsTasksScope: boolean;
+	/** The app's own list, created on first use. Stored so it is found again. */
+	listId: string | null;
 	warning: string | null;
 };
 
 export async function drainPhoneInbox(
 	userId: string,
 	auth: OAuth2Client,
-	timezone: string
+	timezone: string,
+	knownListId: string | null
 ): Promise<InboxResult> {
 	const result: InboxResult = {
 		imported: 0,
 		titles: [],
 		needsTasksScope: false,
+		listId: null,
 		warning: null
 	};
 
 	let captures;
+	let listId: string;
 	try {
-		captures = await readPhoneCaptures(auth);
+		// The app's own list, and only ever that one. The user's other lists are
+		// theirs; swallowing a personal item into the plan and marking it
+		// completed is not a mistake they could undo by hand.
+		listId = await ensureInboxList(auth, knownListId);
+		result.listId = listId;
+		captures = await readPhoneCaptures(auth, listId);
 	} catch (error) {
 		if (isMissingTasksScope(error)) {
 			// Not a failure — a setup step. Sign out and in once to grant it.
@@ -87,7 +102,8 @@ export async function drainPhoneInbox(
 				capture,
 				parsed.deadline
 					? `due ${formatInTimeZone(parsed.deadline, timezone, 'EEE d MMM')}`
-					: null
+					: null,
+				listId
 			);
 
 			result.imported++;

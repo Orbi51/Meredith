@@ -43,6 +43,11 @@ export const settings = pgTable('settings', {
 	timezone: text('timezone').notNull().default('Europe/Paris'),
 	/** The app's own secondary calendar. The only calendar we ever write to. */
 	targetCalendarId: text('target_calendar_id'),
+	/**
+	 * The app's own Google Tasks list — the phone's capture inbox, and the only
+	 * list it ever reads or writes. The user's other lists are private to them.
+	 */
+	tasksListId: text('tasks_list_id'),
 	/** Incremental sync token from the Google events.list response. */
 	syncToken: text('sync_token'),
 	weeklyCapacityHours: doublePrecision('weekly_capacity_hours').notNull().default(35),
