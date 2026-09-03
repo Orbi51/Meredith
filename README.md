@@ -101,6 +101,47 @@ the current time as an argument and returns blocks; that is what makes the
 whole of it testable against fixtures in milliseconds. Every change to it comes
 with a test.
 
+## Deploying to Netlify
+
+The free tier is enough, and it permits commercial use.
+
+1. **Push this repository to GitHub**, then in Netlify: *Add new site → Import
+   an existing project*. The build command and publish directory come from
+   `netlify.toml`; nothing to type.
+
+2. **Set the environment variables** (Site configuration → Environment
+   variables). The full list is in [NOTES.md](NOTES.md) §5. The ones that
+   differ from local:
+
+   ```
+   AUTH_URL=https://your-site.netlify.app
+   ENABLE_DAILY_JOB=false      # serverless: the scheduled function does it
+   LLM_PROVIDER=none           # or anthropic; Ollama is not reachable from Netlify
+   ```
+
+   Copy `AUTH_SECRET`, `TOKEN_ENCRYPTION_KEY`, `CRON_SECRET` and the VAPID keys
+   from your local `.env` — do not regenerate them. Changing
+   `TOKEN_ENCRYPTION_KEY` makes the stored Google refresh token undecryptable,
+   with no error that says so.
+
+3. **Add the redirect URI to your Google OAuth client**, alongside the
+   localhost one:
+
+   ```
+   https://your-site.netlify.app/auth/callback/google
+   ```
+
+4. **Deploy, then sign in on the deployed site.** The Google token is stored per
+   user, not per environment, so signing in locally already covers you — but
+   check `/debug/calendar` passes against production before trusting it.
+
+The daily brief runs from `netlify/functions/daily.mts` at 05:00 UTC. Netlify
+lists it under *Functions → Scheduled functions* once deployed.
+
+**`LLM_PROVIDER=none` on Netlify** unless you have an Anthropic key: Ollama
+runs on your machine and Netlify cannot reach it. Capture still works — you
+lose title tidying and nothing else.
+
 ## Notifications, and the silence between them
 
 Two messages exist, and no others: a morning brief when something is planned,

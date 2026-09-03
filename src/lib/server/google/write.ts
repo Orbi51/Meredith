@@ -124,35 +124,64 @@ export async function applySync(
 ): Promise<AppliedEvent[]> {
 	assertOwnCalendar(calendarId, ownCalendarId);
 	const api = calendarApi(auth);
-	const applied: AppliedEvent[] = [];
 
-	for (const event of plan.insert) {
-		const created = await api.events.insert({
-			calendarId,
-			requestBody: toRequestBody(event, timezone)
-		});
-		if (created.data.id) applied.push({ blockId: event.blockId, googleEventId: created.data.id });
-	}
+	// Every one of these touches a different event, so they are independent and
+	// run together. Sequentially, a dozen blocks meant a dozen round trips to
+	// Google — several seconds, which matters when the whole job has to finish
+	// inside a serverless function's timeout.
+	//
+	// Capped rather than unbounded: the per-user quota is roughly 600 requests
+	// a minute, and there is no reason to spend it in one burst.
+	const inserted = await inBatches(plan.insert, (event) =>
+		api.events
+			.insert({ calendarId, requestBody: toRequestBody(event, timezone) })
+			.then((created) =>
+				created.data.id
+					? ({ blockId: event.blockId, googleEventId: created.data.id } as AppliedEvent)
+					: null
+			)
+	);
 
-	for (const event of plan.update) {
-		await api.events.patch({
-			calendarId,
-			eventId: event.googleEventId as string,
-			requestBody: toRequestBody(event, timezone)
-		});
-		applied.push({ blockId: event.blockId, googleEventId: event.googleEventId as string });
-	}
+	const updated = await inBatches(plan.update, (event) =>
+		api.events
+			.patch({
+				calendarId,
+				eventId: event.googleEventId as string,
+				requestBody: toRequestBody(event, timezone)
+			})
+			.then(
+				() =>
+					({
+						blockId: event.blockId,
+						googleEventId: event.googleEventId as string
+					}) as AppliedEvent
+			)
+	);
 
-	for (const eventId of plan.remove) {
+	await inBatches(plan.remove, async (eventId) => {
 		try {
 			await api.events.delete({ calendarId, eventId });
 		} catch (error) {
 			// Already gone (410/404) is the outcome we wanted anyway.
 			if (!isMissing(error)) throw error;
 		}
-	}
+		return null;
+	});
 
-	return applied;
+	return [...inserted, ...updated].filter((entry): entry is AppliedEvent => entry !== null);
+}
+
+/** Run `work` over `items` a few at a time, preserving order in the result. */
+async function inBatches<T, R>(
+	items: T[],
+	work: (item: T) => Promise<R>,
+	size = 8
+): Promise<R[]> {
+	const results: R[] = [];
+	for (let index = 0; index < items.length; index += size) {
+		results.push(...(await Promise.all(items.slice(index, index + size).map(work))));
+	}
+	return results;
 }
 
 function toRequestBody(event: DesiredEvent, timezone: string) {

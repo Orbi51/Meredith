@@ -197,18 +197,26 @@ export async function readAppointments(
 	const calendars = await listCalendars(auth);
 	const appointments: CalendarAppointment[] = [];
 
-	for (const calendar of calendars) {
-		if (!calendar.id || calendar.id === options.excludeCalendarId) continue;
+	// One request per calendar, all in flight together. Sequentially this was
+	// the single slowest thing the app did.
+	const wanted = calendars.filter(
+		(calendar) => calendar.id && calendar.id !== options.excludeCalendarId
+	);
+	const responses = await Promise.all(
+		wanted.map((calendar) =>
+			api.events.list({
+				calendarId: calendar.id as string,
+				timeMin: options.timeMin.toISOString(),
+				timeMax: options.timeMax.toISOString(),
+				singleEvents: true,
+				orderBy: 'startTime',
+				maxResults: 2500
+			})
+		)
+	);
 
-		const response = await api.events.list({
-			calendarId: calendar.id,
-			timeMin: options.timeMin.toISOString(),
-			timeMax: options.timeMax.toISOString(),
-			singleEvents: true,
-			orderBy: 'startTime',
-			maxResults: 2500
-		});
-
+	for (const [index, response] of responses.entries()) {
+		const calendar = wanted[index]!;
 		for (const event of response.data.items ?? []) {
 			// An event marked "free" is not a commitment, whatever it says.
 			if (event.transparency === 'transparent') continue;
@@ -224,7 +232,7 @@ export async function readAppointments(
 				summary: event.summary ?? '(no title)',
 				allDay: Boolean(event.start?.date),
 				eventId: event.id,
-				calendarId: calendar.id,
+				calendarId: calendar.id as string,
 				primary: Boolean(calendar.primary)
 			});
 		}

@@ -218,11 +218,38 @@ Neon's free tier covers the database and is already in use. It suspends after
 about five minutes idle and wakes on the next connection, which adds a second
 or so to the first request — harmless here.
 
-For the app itself, see the README. Note that the daily job currently runs
-**inside the app process** (`ENABLE_DAILY_JOB=true`), which needs a host that
-keeps a process alive. On a serverless host it must instead be driven by a
-scheduled request to `POST /api/cron/daily` with the `CRON_SECRET` — that
-endpoint exists and is tested for exactly this reason.
+The app deploys to **Netlify's free tier**, which permits commercial use —
+unlike Vercel's Hobby plan, which is licensed for non-commercial projects and
+would be the wrong home for a tool that runs your business.
+
+Netlify is serverless, so there is no process to hold a timer: set
+`ENABLE_DAILY_JOB=false` and let `netlify/functions/daily.mts` do it. It runs
+at 05:00 UTC and calls `POST /api/cron/daily` with the `CRON_SECRET`.
+
+### The ten-second limit is real
+
+Netlify functions are killed at 10 seconds on the free tier, and the daily job
+originally took **7 seconds** — one bad week of calendar growth from failing in
+production every morning, silently.
+
+It now takes about 3. The fix was to stop doing everything one round trip at a
+time: reading every calendar in parallel, and applying calendar writes in
+batches of eight rather than one after another. If you add work to the daily
+job, measure it:
+
+```bash
+curl -s -o /dev/null -w "%{time_total}s
+" -X POST   -H "Authorization: Bearer $CRON_SECRET" http://localhost:5173/api/cron/daily
+```
+
+Incremental sync (§4 above) is the next lever if it creeps up again.
+
+### Cron is UTC only
+
+`0 5 * * *` is 07:00 Paris in summer, 06:00 in winter. Netlify has no timezone
+setting, so the brief drifts by an hour across the year. An hour either side of
+seven is still the morning; if that ever matters, move the schedule to 06:00
+UTC in winter or check the local hour inside the job.
 
 ### Environment variables for production
 

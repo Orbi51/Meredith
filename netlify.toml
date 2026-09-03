@@ -1,0 +1,21 @@
+[build]
+  command = "npm run build"
+  publish = "build"
+
+[functions]
+  # Our own functions. SvelteKit's own handler is generated separately into
+  # .netlify/functions-internal and is picked up automatically.
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[[headers]]
+  for = "/service-worker.js"
+  [headers.values]
+    # The worker must never itself be served from cache, or a stale one can
+    # keep serving a stale app indefinitely.
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
