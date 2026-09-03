@@ -81,6 +81,12 @@ The app's use of information received from Google APIs adheres to the
 [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy),
 including the Limited Use requirements.
 
+## Related
+
+The [terms of service](TERMS.md) describe the arrangement this policy is part
+of — in particular that the app is a personal tool with no warranty, and must
+not be relied on as the sole record of a commitment.
+
 ## Contact
 
 quentin.pointillart@gmail.com
