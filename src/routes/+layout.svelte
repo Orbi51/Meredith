@@ -1,6 +1,5 @@
 <script lang="ts">
 	import '../app.css';
-	import { SignIn, SignOut } from '@auth/sveltekit/components';
 	import type { LayoutData } from './$types';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
@@ -17,17 +16,19 @@
 
 		{#if data.session?.user}
 			<span class="text-neutral-400">{data.session.user.email}</span>
-			<SignOut>
-				{#snippet submitButton()}
-					<span class="cursor-pointer underline hover:text-neutral-900">Sign out</span>
-				{/snippet}
-			</SignOut>
+			<!-- Plain forms rather than Auth.js's Svelte 4 components: these post to
+			     the action routes in /signin and /signout, which is the same thing
+			     the components do, without the slot/snippet mismatch. -->
+			<form method="POST" action="/signout">
+				<button class="cursor-pointer underline hover:text-neutral-900">Sign out</button>
+			</form>
 		{:else}
-			<SignIn provider="google">
-				{#snippet submitButton()}
-					<span class="cursor-pointer underline hover:text-neutral-900">Sign in with Google</span>
-				{/snippet}
-			</SignIn>
+			<form method="POST" action="/signin">
+				<input type="hidden" name="providerId" value="google" />
+				<button class="cursor-pointer underline hover:text-neutral-900">
+					Sign in with Google
+				</button>
+			</form>
 		{/if}
 	</nav>
 	{@render children()}
