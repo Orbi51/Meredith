@@ -34,6 +34,7 @@ import type { SchedulerInput, SchedulerOutput } from '$lib/scheduler/types';
 import { clientForUser } from './google/client';
 import { readAppointments, readBusyIntervals } from './google/read';
 import { adoptCalendarWork } from './adopt';
+import { drainPhoneInbox } from './phone-inbox';
 import {
 	applySync,
 	ensureTargetCalendar,
@@ -46,6 +47,8 @@ import type { DesiredEvent } from './google/write';
 export type ReplanResult = {
 	output: SchedulerOutput;
 	blocksWritten: number;
+	/** What was picked up from Google Tasks on the way in. */
+	phoneInbox: { imported: number; titles: string[]; needsTasksScope: boolean };
 	/** Null when the plan was not pushed to Google (no credentials, or dryRun). */
 	calendarSync: { inserted: number; updated: number; removed: number } | null;
 	warnings: string[];
@@ -100,6 +103,7 @@ export async function replan(userId: string, options: ReplanOptions = {}): Promi
 	const canUseGoogle = Boolean(user?.googleRefreshToken) && !options.skipCalendar;
 
 	// ---------------------------------------------------------------- read
+	let phoneInbox = { imported: 0, titles: [] as string[], needsTasksScope: false };
 	let busyIntervals: { start: Date; end: Date }[] = [];
 	let auth: ReturnType<typeof clientForUser> | null = null;
 	let targetCalendarId = settings.targetCalendarId;
@@ -124,6 +128,22 @@ export async function replan(userId: string, options: ReplanOptions = {}): Promi
 				timezone: settings.timezone
 			});
 			busyIntervals = appointments.map((a) => ({ start: a.start, end: a.end }));
+
+			// Drain the phone's inbox BEFORE scheduling, so anything captured
+			// away from the machine is planned on this very run rather than
+			// waiting for the next one.
+			const inbox = await drainPhoneInbox(userId, auth, settings.timezone);
+			phoneInbox = {
+				imported: inbox.imported,
+				titles: inbox.titles,
+				needsTasksScope: inbox.needsTasksScope
+			};
+			if (inbox.warning) warnings.push(inbox.warning);
+			if (inbox.needsTasksScope) {
+				warnings.push(
+					'Google Tasks is not authorised yet — sign out and in again to capture from your phone.'
+				);
+			}
 
 			// Adopt work the user scheduled by hand before planning around it, so
 			// this run already accounts for it.
@@ -175,7 +195,7 @@ export async function replan(userId: string, options: ReplanOptions = {}): Promi
 		}
 	}
 
-	return { output, blocksWritten: blockRows.length, calendarSync, warnings };
+	return { output, blocksWritten: blockRows.length, calendarSync, warnings, phoneInbox };
 }
 
 /**

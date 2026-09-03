@@ -192,12 +192,17 @@ export const actions: Actions = {
 		return {
 			ok: true,
 			message: [
+				result.phoneInbox.imported > 0
+					? `picked up ${result.phoneInbox.imported} from your phone (${result.phoneInbox.titles.join(', ')})`
+					: null,
 				`${result.blocksWritten} blocks planned`,
 				result.calendarSync
 					? `calendar: +${result.calendarSync.inserted} ~${result.calendarSync.updated} −${result.calendarSync.removed}`
 					: 'calendar not updated',
 				...result.warnings
-			].join(' · ')
+			]
+				.filter(Boolean)
+				.join(' · ')
 		};
 	}
 };

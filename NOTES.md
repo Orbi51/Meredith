@@ -210,7 +210,45 @@ The plan defines these, and only time meets them:
 
 ---
 
-## 5. Hosting
+## 5. The phone, without hosting
+
+Hosting existed to solve one problem: using this away from the machine. Both
+halves of that turned out to be available through apps Google already ships.
+
+**Seeing the plan** — the app writes blocks to its own `Planned work` calendar,
+which appears in the Google Calendar app on the phone with no further work.
+This has been true since Phase 0.
+
+**Capturing** — anything typed into the **Google Tasks** app is drained into
+the inbox here on the next replan, parsed by the same parser as the quick-add
+bar (the dash format works from the phone too). The task is then *completed* in
+Google Tasks rather than deleted, so a misparse is still recoverable from the
+"completed" view, and the phone list stays an inbox rather than an archive.
+
+Dates resolve against **when the task was typed**, not when it was drained.
+"demain", captured on Monday and picked up on Wednesday, still means Tuesday.
+
+### Setup
+
+1. Enable the **Google Tasks API** in the Cloud Console (separate from the
+   Calendar API, same as before).
+2. Add the scope `https://www.googleapis.com/auth/tasks` on the consent screen.
+3. **Sign out and back in.** A refresh token carries the scopes it was granted
+   with; an existing one will keep returning `403 Insufficient Permission`
+   until it is replaced. The app reports this as a setup step rather than an
+   error.
+
+### What this costs
+
+Nothing is planned while the machine is off, and there are no push
+notifications. For someone who works at that machine, a capture waiting until
+the app is next opened costs nothing — and it removes hosting, a database in
+the cloud, VAPID keys, and a build pipeline from the setup.
+
+The Netlify port is still in the repository and still works, if the trade ever
+stops being worth it.
+
+## 6. Hosting
 
 The app needs three things: somewhere to run Node, a Postgres database, and
 HTTPS (web push and installable PWAs both require it).

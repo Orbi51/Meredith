@@ -20,9 +20,15 @@ import { env } from '$env/dynamic/private';
 import { decrypt } from '../crypto';
 
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar';
+/**
+ * Google Tasks is the phone's capture surface: anything typed into the Google
+ * Tasks app is drained into the inbox here the next time the app runs. It is
+ * what lets this stay a local app with no hosting.
+ */
+export const TASKS_SCOPE = 'https://www.googleapis.com/auth/tasks';
 
 export const AUTHORIZATION_PARAMS = {
-	scope: ['openid', 'email', 'profile', CALENDAR_SCOPE].join(' '),
+	scope: ['openid', 'email', 'profile', CALENDAR_SCOPE, TASKS_SCOPE].join(' '),
 	// Both are required to be handed a refresh token. Without `prompt: consent`
 	// Google returns one only on the very first authorisation, and if that one
 	// is ever lost there is no way to get another without revoking access.
