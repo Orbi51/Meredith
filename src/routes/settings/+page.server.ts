@@ -14,6 +14,8 @@ import {
 } from '$lib/server/db/queries';
 import { ALL_KINDS, buildCalibrationTable } from '$lib/scheduler/calibration';
 import { replan } from '$lib/server/planner';
+import { ensureRecurringAdmin, projectEconomics, upcomingAdmin } from '$lib/server/freelance';
+import { pushConfigured } from '$lib/server/notify';
 import type { TaskKind, WorkingHours } from '$lib/scheduler/types';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -29,6 +31,8 @@ export const load: PageServerLoad = async (event) => {
 
 	const table = buildCalibrationTable(samples);
 	const byDay = new Map(workingHours.map((h) => [h.dayOfWeek, h]));
+	const timezone = settings?.timezone ?? 'Europe/Paris';
+	const economics = await projectEconomics(user.id);
 
 	return {
 		settings: {
@@ -42,6 +46,13 @@ export const load: PageServerLoad = async (event) => {
 			dayOfWeek,
 			name: DAY_NAMES[dayOfWeek] as string,
 			intervals: byDay.get(dayOfWeek)?.intervals ?? []
+		})),
+		pushAvailable: pushConfigured(),
+		economics,
+		upcomingAdmin: upcomingAdmin(new Date(), timezone).map((item) => ({
+			title: item.title,
+			deadline: item.deadline,
+			estimateHours: item.estimateHours
 		})),
 		calibration: ALL_KINDS.map((kind: TaskKind) => ({
 			kind,
@@ -93,5 +104,30 @@ export const actions: Actions = {
 		}
 
 		return { ok: true, message: 'Working hours saved and the plan rebuilt.' };
+	},
+
+	/** Create the invoicing and URSSAF tasks that do not exist yet. */
+	generateAdmin: async (event) => {
+		const user = await requireUser(event);
+		const settings = await getSettings(user.id);
+		const created = await ensureRecurringAdmin(
+			user.id,
+			new Date(),
+			settings?.timezone ?? 'Europe/Paris'
+		);
+
+		try {
+			await replan(user.id);
+		} catch {
+			/* the tasks exist; the plan will catch up */
+		}
+
+		return {
+			ok: true,
+			message:
+				created === 0
+					? 'Nothing to add — the upcoming admin is already on the list.'
+					: `${created} recurring admin task${created === 1 ? '' : 's'} added.`
+		};
 	}
 };

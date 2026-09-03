@@ -54,7 +54,15 @@ export const settings = pgTable('settings', {
 	 * opens straight to /plan on Monday mornings until this matches the current
 	 * week.
 	 */
-	ritualCompletedWeek: text('ritual_completed_week')
+	ritualCompletedWeek: text('ritual_completed_week'),
+	/**
+	 * A fingerprint of the last overcommitment report the user was notified
+	 * about. §10: interrupt only when the report gets WORSE. A notification
+	 * because the calendar shuffled is noise, and noise is why people abandon
+	 * these tools.
+	 */
+	lastRiskDigest: text('last_risk_digest'),
+	lastBriefSentOn: text('last_brief_sent_on')
 });
 
 export const projects = pgTable('projects', {
@@ -189,4 +197,21 @@ export const ignoredEvents = pgTable('ignored_events', {
 		.references(() => users.id, { onDelete: 'cascade' }),
 	googleEventId: text('google_event_id').notNull(),
 	ignoredAt: timestamp('ignored_at', { withTimezone: true }).notNull().defaultNow()
+});
+
+/**
+ * Web push subscriptions (§11).
+ *
+ * One row per device. A subscription that Google or Apple rejects as gone is
+ * deleted rather than retried — a dead endpoint stays dead.
+ */
+export const pushSubscriptions = pgTable('push_subscriptions', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	userId: uuid('user_id')
+		.notNull()
+		.references(() => users.id, { onDelete: 'cascade' }),
+	endpoint: text('endpoint').notNull(),
+	p256dh: text('p256dh').notNull(),
+	auth: text('auth').notNull(),
+	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 });

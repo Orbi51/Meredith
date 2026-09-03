@@ -15,7 +15,7 @@ it before changing anything; this README only covers how to run the thing.
 | 1 — Scheduler | **Done.** Pure module, 53 tests, including determinism and DST |
 | 2 — Core app | **Built**, awaiting a real week of use — that is the threshold |
 | 3 — Ritual and calibration | **Built.** The six-step Monday flow at `/plan`; threshold is four weeks of samples showing calibrated estimates beating raw ones |
-| 4 — PWA and freelance layer | Not started |
+| 4 — PWA and freelance layer | **Built.** Manifest, service worker, offline capture queue, share target, web push, hourly rate and recurring admin. Threshold is daily phone use |
 
 Phase 2 gives you: quick capture with LLM parsing (`Ctrl+K`), task and project
 CRUD, working-hours settings, the today and week views, one-tap block
@@ -96,6 +96,32 @@ The hard rule is that `src/lib/scheduler/` stays pure. `schedule(input)` takes
 the current time as an argument and returns blocks; that is what makes the
 whole of it testable against fixtures in milliseconds. Every change to it comes
 with a test.
+
+## Notifications, and the silence between them
+
+Two messages exist, and no others: a morning brief when something is planned,
+and an alert when a deadline has newly become impossible. The daily job
+fingerprints the overcommitment report and compares it with the last state the
+user was told about — the fingerprint covers WHICH tasks are at risk, not when
+their blocks sit, so a plan that merely shuffles sends nothing.
+
+Verified: the first run alerts, the second run on unchanged data is silent.
+
+Set up the daily run on Railway as a scheduled job:
+
+```bash
+curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://your-app/api/cron/daily
+```
+
+It also keeps the Google refresh token alive — tokens expire after about six
+months of disuse, and a daily call means that never happens.
+
+## Offline capture
+
+A capture made without a connection goes to IndexedDB and is posted when the
+network returns. Dates resolve against when it was TYPED, not when the queue
+drained: "demain", captured on a train on Monday and flushed on Wednesday,
+still means Tuesday.
 
 ## Work adopted from Google Calendar
 
