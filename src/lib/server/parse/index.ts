@@ -1,202 +1,179 @@
 /**
  * Turning "storyboard rev2 Studio X ~6h friday" into a structured task.
  *
- * The governing rule from §8: **never reject input**. If the model is
- * unavailable, slow, confused, or returns nonsense, the text becomes a
- * title-only task in the inbox. A capture that fails is a capture the user
- * stops making, and then the app dies.
+ * The governing rule from §8: **never reject input**. If the model is missing,
+ * slow, or confused, the deterministic parser still produces a task. A capture
+ * that fails is a capture the user stops making, and then the app dies.
  *
- * The API key is server-side only and must never reach the client.
+ * Order of work:
+ *   1. `deterministic.ts` extracts the estimate, deadline and kind. These have
+ *      exactly one right answer and code gets them right every time.
+ *   2. A model — local or hosted, or none at all — tidies the title and spots a
+ *      project name. Only these two, and only as a suggestion.
+ *   3. Everything the model says is validated before it is believed.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
-import { env } from '$env/dynamic/private';
 import { formatInTimeZone } from 'date-fns-tz';
 import type { TaskKind } from '$lib/scheduler/types';
+import { detectKind, extractDeadline, extractEstimate, stripMatches } from './deterministic';
+import { activeProvider, callModel } from './providers';
 
 export type ParsedTask = {
 	title: string;
 	/** Matched against an existing project. Never silently creates one. */
 	projectId: string | null;
-	/** The project name the model believed it saw, when nothing matched. */
+	/** A project name we saw but could not match, offered as a confirmable chip. */
 	unmatchedProjectName: string | null;
 	estimateHours: number | null;
 	deadline: Date | null;
 	kind: TaskKind;
-	/** False when we fell back to a title-only task. */
-	parsed: boolean;
-	/** Shown to the user so a misparse costs one click, not an edit screen. */
+	/** How the result was arrived at, shown to the user. */
+	source: 'deterministic' | 'model-assisted';
 	note: string | null;
 };
 
 export type ProjectChoice = { id: string; name: string; clientName: string | null };
 
-const MODEL = 'claude-sonnet-5';
-
-/** A task with only a title is valid and schedulable. This is the safety net. */
-function titleOnly(text: string, note: string | null = null): ParsedTask {
-	return {
-		title: text.trim().slice(0, 200) || 'Untitled task',
-		projectId: null,
-		unmatchedProjectName: null,
-		estimateHours: null,
-		deadline: null,
-		kind: 'creative',
-		parsed: false,
-		note
-	};
-}
-
 export async function parseQuickAdd(
 	text: string,
 	options: { projects: ProjectChoice[]; timezone: string; now: Date }
 ): Promise<ParsedTask> {
-	if (!text.trim()) return titleOnly('');
-	if (!env.ANTHROPIC_API_KEY) {
-		return titleOnly(text, 'Saved as-is — no ANTHROPIC_API_KEY configured.');
+	const trimmed = text.trim();
+	if (!trimmed) {
+		return {
+			title: 'Untitled task',
+			projectId: null,
+			unmatchedProjectName: null,
+			estimateHours: null,
+			deadline: null,
+			kind: 'creative',
+			source: 'deterministic',
+			note: null
+		};
 	}
 
-	try {
-		const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
-		const localNow = formatInTimeZone(options.now, options.timezone, "EEEE d MMMM yyyy, HH:mm");
+	// ------------------------------------------------------------------ step 1
+	const estimate = extractEstimate(trimmed);
+	const deadline = extractDeadline(trimmed, options.now, options.timezone);
+	const kind = detectKind(trimmed);
 
-		const response = await client.messages.create({
-			model: MODEL,
-			max_tokens: 400,
-			system:
-				'You extract structured task data from a freelance 3D/CG artist\'s shorthand. ' +
-				'Reply with a single JSON object and nothing else. Never invent detail that is ' +
-				'not present or clearly implied.',
-			messages: [
-				{
-					role: 'user',
-					content: buildPrompt(text, options.projects, localNow, options.timezone)
-				}
-			],
-			tools: [
-				{
-					name: 'record_task',
-					description: 'Record the structured form of the captured task.',
-					input_schema: {
-						type: 'object',
-						properties: {
-							title: {
-								type: 'string',
-								description:
-									'The task itself, with the project name, estimate and date removed.'
-							},
-							project_name: {
-								type: ['string', 'null'],
-								description: 'Project or client mentioned, verbatim. Null if none.'
-							},
-							estimate_hours: {
-								type: ['number', 'null'],
-								description: 'Estimate in hours. "~6h" is 6, "half a day" is 4. Null if absent.'
-							},
-							deadline_iso: {
-								type: ['string', 'null'],
-								description:
-									'Deadline as an ISO 8601 datetime with offset, resolved against the ' +
-									'current date. Null if no date is mentioned.'
-							},
-							kind: {
-								type: 'string',
-								enum: ['creative', 'admin', 'machine'],
-								description:
-									'creative = modelling, lookdev, animation. admin = invoicing, email, ' +
-									'planning. machine = renders and bakes that run unattended.'
-							}
-						},
-						required: ['title', 'kind']
-					}
-				}
-			],
-			tool_choice: { type: 'tool', name: 'record_task' }
+	// A project named in the text is found by matching, not by asking a model —
+	// exact matching beats a 7B model's memory of a list every time.
+	const projectFromText = findProjectInText(trimmed, options.projects);
+
+	let title = stripMatches(trimmed, [
+		estimate?.matched ?? '',
+		deadline?.matched ?? '',
+		projectFromText?.matchedText ?? ''
+	]);
+
+	let projectId = projectFromText?.project.id ?? null;
+	let unmatchedProjectName: string | null = null;
+	let source: ParsedTask['source'] = 'deterministic';
+
+	// ------------------------------------------------------------------ step 2
+	if (activeProvider() !== 'none') {
+		const suggestion = await callModel({
+			text: trimmed,
+			draftTitle: title,
+			projectNames: options.projects.map((p) => p.name)
 		});
 
-		const toolUse = response.content.find((block) => block.type === 'tool_use');
-		if (!toolUse || toolUse.type !== 'tool_use') {
-			return titleOnly(text, 'Could not read the parse result — saved as a plain task.');
+		if (suggestion) {
+			// ------------------------------------------------------------ step 3
+			// A tidied title is believed only if it is actually tidier. Small
+			// models love to helpfully re-add "for Studio X on Friday", which is
+			// precisely the text we just removed.
+			const candidate = suggestion.title?.trim();
+			if (candidate && candidate.length > 0 && candidate.length <= title.length && !reintroducesNoise(candidate, trimmed)) {
+				title = candidate;
+				source = 'model-assisted';
+			}
+
+			// A project suggestion is believed only if the name it gives actually
+			// appears in what the user typed. Small models will confidently
+			// attach the first project on the list to "fix the thing" — and
+			// because that name IS a real project, matching alone would let the
+			// hallucination straight through. A wrong project is worse than none:
+			// the user does not notice it, and the hours land on the wrong client.
+			if (!projectId && suggestion.projectName && appearsInText(suggestion.projectName, trimmed)) {
+				const matched = matchProject(suggestion.projectName, options.projects);
+				if (matched) {
+					projectId = matched.id;
+				} else {
+					// A name we do not know, but that the user did type: offered as a
+					// chip, never created behind their back.
+					unmatchedProjectName = suggestion.projectName;
+				}
+				source = 'model-assisted';
+			}
 		}
-
-		return fromToolInput(toolUse.input as Record<string, unknown>, text, options.projects);
-	} catch (error) {
-		// Network trouble, rate limit, bad key — none of it is the user's problem.
-		return titleOnly(
-			text,
-			`Saved as-is — parsing failed (${error instanceof Error ? error.message : 'unknown error'}).`
-		);
 	}
-}
-
-function buildPrompt(
-	text: string,
-	projects: ProjectChoice[],
-	localNow: string,
-	timezone: string
-): string {
-	const projectList =
-		projects.length > 0
-			? projects
-					.map((p) => `- ${p.name}${p.clientName ? ` (client: ${p.clientName})` : ''}`)
-					.join('\n')
-			: '(none yet)';
-
-	return [
-		`Current date and time: ${localNow} (${timezone}).`,
-		'',
-		'Existing projects:',
-		projectList,
-		'',
-		'Capture this task:',
-		text,
-		'',
-		'Notes:',
-		'- A bare weekday such as "friday" means the next occurrence of that day.',
-		'- Times default to the end of the working day (18:00) when only a date is given.',
-		'- If no project is mentioned, project_name must be null. Do not guess.',
-		'- The title must read naturally on its own.'
-	].join('\n');
-}
-
-function fromToolInput(
-	input: Record<string, unknown>,
-	original: string,
-	projects: ProjectChoice[]
-): ParsedTask {
-	const title = typeof input.title === 'string' && input.title.trim() ? input.title.trim() : original.trim();
-
-	const kind: TaskKind =
-		input.kind === 'admin' || input.kind === 'machine' || input.kind === 'creative'
-			? input.kind
-			: 'creative';
-
-	const estimateHours =
-		typeof input.estimate_hours === 'number' && input.estimate_hours > 0
-			? input.estimate_hours
-			: null;
-
-	let deadline: Date | null = null;
-	if (typeof input.deadline_iso === 'string') {
-		const candidate = new Date(input.deadline_iso);
-		if (!Number.isNaN(candidate.getTime())) deadline = candidate;
-	}
-
-	const projectName = typeof input.project_name === 'string' ? input.project_name : null;
-	const match = projectName ? matchProject(projectName, projects) : null;
 
 	return {
-		title: title.slice(0, 200),
-		projectId: match?.id ?? null,
-		// A name we could not match is offered as a confirmable chip — §8 forbids
-		// silently creating a project the user never asked for.
-		unmatchedProjectName: projectName && !match ? projectName : null,
-		estimateHours,
-		deadline,
-		kind,
-		parsed: true,
-		note: null
+		title: (title || trimmed).slice(0, 200),
+		projectId,
+		unmatchedProjectName,
+		estimateHours: estimate?.value ?? null,
+		deadline: deadline?.value ?? null,
+		kind: kind?.value ?? 'creative',
+		source,
+		note: describe(estimate?.value ?? null, deadline?.value ?? null, options.timezone)
 	};
+}
+
+/** A short, honest description of what was understood. */
+function describe(
+	estimateHours: number | null,
+	deadline: Date | null,
+	timezone: string
+): string | null {
+	const parts: string[] = [];
+	if (estimateHours !== null) parts.push(`${estimateHours}h`);
+	if (deadline) parts.push(`due ${formatInTimeZone(deadline, timezone, 'EEE d MMM HH:mm')}`);
+	return parts.length ? `Read: ${parts.join(', ')}` : null;
+}
+
+/** Does this title put back the dates and durations we stripped out? */
+function reintroducesNoise(candidate: string, original: string): boolean {
+	if (/\d\s*(?:h|hr|min|hours?|heures?)\b/i.test(candidate)) return true;
+	if (/\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|today|tomorrow|demain|aujourd)/i.test(candidate)) {
+		return true;
+	}
+	// A title longer than what the user typed is not a tidier title.
+	return candidate.length > original.length;
+}
+
+function appearsInText(name: string, text: string): boolean {
+	const haystack = text.toLowerCase();
+	return name
+		.toLowerCase()
+		.split(/\s+/)
+		.filter((word) => word.length > 2)
+		.some((word) => haystack.includes(word));
+}
+
+/**
+ * Find a known project named in the text, longest name first so that
+ * "Aurora titles" wins over a project merely called "Aurora".
+ */
+function findProjectInText(
+	text: string,
+	projects: ProjectChoice[]
+): { project: ProjectChoice; matchedText: string } | null {
+	const haystack = text.toLowerCase();
+	const candidates = [...projects].sort((a, b) => b.name.length - a.name.length);
+
+	for (const project of candidates) {
+		for (const needle of [project.name, project.clientName]) {
+			if (!needle || needle.length < 3) continue;
+			const index = haystack.indexOf(needle.toLowerCase());
+			if (index !== -1) {
+				return { project, matchedText: text.slice(index, index + needle.length) };
+			}
+		}
+	}
+	return null;
 }
 
 /**

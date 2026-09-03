@@ -36,7 +36,10 @@
 	</p>
 
 	{#if data.parsed.note}
-		<p class="mt-3 rounded bg-amber-50 p-3 text-sm text-amber-800">{data.parsed.note}</p>
+		<p class="mt-3 rounded bg-neutral-100 p-3 text-sm text-neutral-700">
+			{data.parsed.note}
+			<span class="ml-1 text-xs text-neutral-500">({data.parsed.source})</span>
+		</p>
 	{/if}
 
 	<form method="POST" action="?/save" class="mt-4 max-w-xl space-y-3">
