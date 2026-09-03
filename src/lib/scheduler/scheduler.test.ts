@@ -264,6 +264,63 @@ describe('ordering', () => {
 		expect(output.blocks.some((b) => b.taskId === 'blocked')).toBe(false);
 	});
 
+	it('does not let one impossible task starve work that would have fitted', () => {
+		// 400h due in two days cannot be done. Left unchecked it takes the whole
+		// three-week horizon and everything else gets nothing — which makes the
+		// plan useless precisely when the user most needs it to be honest.
+		const output = schedule(
+			input({
+				tasks: [
+					task({
+						id: 'impossible',
+						estimateHours: 400,
+						kind: 'admin',
+						deadline: paris('2026-09-09T18:00')
+					}),
+					task({
+						id: 'doable',
+						estimateHours: 9,
+						kind: 'creative',
+						deadline: paris('2026-09-18T18:00')
+					})
+				]
+			})
+		);
+
+		const doableHours = output.blocks
+			.filter((b) => b.taskId === 'doable')
+			.reduce((sum, b) => sum + hoursBetween(b.start, b.end), 0);
+
+		expect(doableHours).toBe(9);
+		expect(output.unplaced.map((u) => u.taskId)).toEqual(['impossible']);
+		// The impossible task is still reported as impossible, loudly.
+		expect(output.atRisk.find((r) => r.taskId === 'impossible')?.slackHours).toBeLessThan(0);
+	});
+
+	it('still lets an urgent task take the week when it genuinely fits', () => {
+		// The guard above must not become "everything gets a fair share": a task
+		// that can be finished on time still gets priority over a slacker one.
+		const output = schedule(
+			input({
+				tasks: [
+					task({
+						id: 'urgent',
+						estimateHours: 30,
+						kind: 'admin',
+						deadline: paris('2026-09-11T18:00')
+					}),
+					task({ id: 'whenever', estimateHours: 20, kind: 'admin' })
+				]
+			})
+		);
+
+		expect(output.blocks[0]!.taskId).toBe('urgent');
+		const urgentEnd = Math.max(
+			...output.blocks.filter((b) => b.taskId === 'urgent').map((b) => b.end.getTime())
+		);
+		expect(urgentEnd).toBeLessThanOrEqual(paris('2026-09-11T18:00').getTime());
+	});
+
 	it('respects earliestStart', () => {
 		const output = schedule(
 			input({

@@ -27,6 +27,7 @@ import {
 	hoursBetween,
 	isoWeekOf,
 	machinePool,
+	minutesBetween,
 	sortIntervals,
 	subtractIntervals
 } from './intervals';
@@ -124,9 +125,56 @@ export function schedule(input: SchedulerInput): SchedulerOutput {
 	/** When each task's work finishes, so dependents can start after it. */
 	const finishedAt = new Map<string, Date>();
 	const fullyPlaced = new Set<string>();
+	/** How much of each task is still to place, carried across the two rounds. */
+	const remainingMinutes = new Map<string, number>();
+	for (const entry of ordered) remainingMinutes.set(entry.task.id, entry.remainingMinutes);
 
-	for (const entry of ordered) {
+	/**
+	 * Placement happens in three rounds, and the ordering between them is what
+	 * stops one overcommitted task from swallowing the whole calendar.
+	 *
+	 *   1. `before-deadline`  — every task gets a chance to fit before its OWN
+	 *      deadline, in slack order. On-time work outranks everything.
+	 *   2. `completable`      — leftovers that can still be finished somewhere in
+	 *      the horizon.
+	 *   3. `hopeless`         — leftovers too large to finish in the horizon at
+	 *      all. These fill whatever is left.
+	 *
+	 * The distinction between 2 and 3 is the one that matters in practice. A
+	 * 400-hour task due on Friday is not going to be finished whatever we do:
+	 * its deadline is blown either way, and the user has to renegotiate. Letting
+	 * it take three weeks of calendar buys nothing and costs the 9-hour job that
+	 * would have fitted easily. Being honest about an impossible deadline is the
+	 * point of this app; making every other plan useless is not.
+	 *
+	 * The hopeless work is still scheduled, still reported, and still shown as
+	 * over its deadline — it simply yields to work that can actually be done.
+	 */
+	for (const round of ['before-deadline', 'completable', 'hopeless'] as const) {
+		for (const entry of ordered) {
+			placeOne(entry, round);
+		}
+	}
+
+	function placeOne(entry: PreparedTask, round: 'before-deadline' | 'completable' | 'hopeless') {
 		const { task } = entry;
+		const remaining = remainingMinutes.get(task.id) ?? 0;
+		if (remaining <= 0) return;
+		// A task with no deadline has nothing to be early for; it waits for later.
+		if (round === 'before-deadline' && !task.deadline) return;
+
+		const poolName: 'human' | 'machine' = task.kind === 'machine' ? 'machine' : 'human';
+
+		if (round !== 'before-deadline') {
+			// Can what is left of this task still be finished inside the horizon?
+			const capacityLeft = pools[poolName].reduce(
+				(sum, interval) => sum + minutesBetween(interval.start, interval.end),
+				0
+			);
+			const completable = remaining <= capacityLeft;
+			if (round === 'completable' && !completable) return;
+			if (round === 'hopeless' && completable) return;
+		}
 
 		// A dependency still in the task list must be placed, and must finish,
 		// before this task may start. A dependency that is absent from the list
@@ -135,53 +183,67 @@ export function schedule(input: SchedulerInput): SchedulerOutput {
 		if (task.dependsOnTaskId) {
 			const dependencyIsPending = ordered.some((o) => o.task.id === task.dependsOnTaskId);
 			if (dependencyIsPending) {
-				if (!fullyPlaced.has(task.dependsOnTaskId)) {
-					unplaced.push({
-						taskId: task.id,
-						hoursShort: roundHours(entry.remainingMinutes / 60),
-						reason: 'dependency-unplaced'
-					});
-					continue;
-				}
+				// Not placed yet: it may still be, later in this round or the next,
+				// so wait rather than declaring failure. Anything still unplaced at
+				// the end is reported below.
+				if (!fullyPlaced.has(task.dependsOnTaskId)) return;
 				dependencyEnd = finishedAt.get(task.dependsOnTaskId) ?? null;
 			}
 		}
 
 		const earliestAllowed = latest([now, task.earliestStart, dependencyEnd]);
+		if (earliestAllowed.getTime() >= horizonEnd.getTime()) return;
 
-		if (earliestAllowed.getTime() >= horizonEnd.getTime()) {
-			unplaced.push({
-				taskId: task.id,
-				hoursShort: roundHours(entry.remainingMinutes / 60),
-				reason: 'starts-after-horizon'
-			});
-			continue;
-		}
-
-		const poolName = task.kind === 'machine' ? 'machine' : 'human';
-		const placement = placeTask(entry, pools[poolName], earliestAllowed, horizonEnd, poolName);
+		const placement = placeTask(
+			{ ...entry, remainingMinutes: remaining },
+			pools[poolName],
+			earliestAllowed,
+			horizonEnd,
+			poolName,
+					round === 'before-deadline' ? (task.deadline?.getTime() ?? Infinity) : Infinity
+		);
 
 		blocks.push(...placement.blocks);
 		pools[poolName] = placement.remainingCapacity;
+		remainingMinutes.set(task.id, placement.leftoverMinutes);
 
 		// The MAX end, not the last block in the array: the placement passes fill
 		// preferred slots first, so a block placed later in the array can sit
 		// earlier in the week. A dependent must wait for the last work to finish,
 		// whichever pass produced it.
-		if (placement.blocks.length > 0) {
-			const finish = Math.max(...placement.blocks.map((b) => b.end.getTime()));
-			finishedAt.set(task.id, new Date(finish));
+		const allBlocks = blocks.filter((b) => b.taskId === task.id);
+		if (allBlocks.length > 0) {
+			finishedAt.set(task.id, new Date(Math.max(...allBlocks.map((b) => b.end.getTime()))));
 		}
 
-		if (placement.leftoverMinutes > 0) {
-			unplaced.push({
-				taskId: task.id,
-				hoursShort: roundHours(placement.leftoverMinutes / 60),
-				reason: task.splittable ? 'no-capacity' : 'no-gap-large-enough'
-			});
-		} else {
-			fullyPlaced.add(task.id);
-		}
+		if (placement.leftoverMinutes <= 0) fullyPlaced.add(task.id);
+	}
+
+	// Whatever is still unplaced after both rounds, with the reason that fits.
+	for (const entry of ordered) {
+		const leftover = remainingMinutes.get(entry.task.id) ?? 0;
+		if (leftover <= 0) continue;
+
+		const { task } = entry;
+		const dependencyPending =
+			task.dependsOnTaskId !== null &&
+			ordered.some((o) => o.task.id === task.dependsOnTaskId) &&
+			!fullyPlaced.has(task.dependsOnTaskId);
+
+		const startsTooLate =
+			task.earliestStart !== null && task.earliestStart.getTime() >= horizonEnd.getTime();
+
+		unplaced.push({
+			taskId: task.id,
+			hoursShort: roundHours(leftover / 60),
+			reason: dependencyPending
+				? 'dependency-unplaced'
+				: startsTooLate
+					? 'starts-after-horizon'
+					: task.splittable
+						? 'no-capacity'
+						: 'no-gap-large-enough'
+		});
 	}
 
 	// ---------------------------------------------------------------- step 6
@@ -290,37 +352,26 @@ function placeTask(
 	capacity: FreeInterval[],
 	earliestAllowed: Date,
 	horizonEnd: Date,
-	pool: 'human' | 'machine'
+	pool: 'human' | 'machine',
+	/** Hard ceiling for this round — the task's deadline, or Infinity. */
+	roundLimit: number
 ): Placement {
 	const { task } = entry;
 	let remaining = entry.remainingMinutes;
 	const blocks: PlannedBlock[] = [];
 	let working = capacity;
 
-	// Passes, in descending order of how happy the user would be with the
-	// result. Two dimensions, and the deadline is the more important one:
-	//
-	//   A. before the deadline, then anywhere in the horizon
-	//   B. within that: reserved for this kind, then reserved for nothing,
-	//      then anything at all
-	//
-	// B alone would let a preference for "modelling in the mornings" push work
-	// past its own deadline while the Thursday afternoon sat empty. Meeting the
-	// deadline beats working at the preferred time of day, every time. The
-	// last pass exists only so a soft preference never leaves real work
-	// unscheduled.
+	// Within a round, passes run in descending order of how happy the user
+	// would be: slots reserved for this kind of work, then slots reserved for
+	// nothing, then anything at all. The last pass exists only so that a soft
+	// preference never leaves real work unscheduled — a deadline beats working
+	// at the preferred time of day, every time.
 	const kindPreferences: ((interval: FreeInterval) => boolean)[] = [
 		(interval) => interval.preferredKind === task.kind,
 		(interval) => interval.preferredKind === null,
 		() => true
 	];
-	const deadlineLimits = task.deadline
-		? [task.deadline.getTime(), Number.POSITIVE_INFINITY]
-		: [Number.POSITIVE_INFINITY];
-
-	const passes = deadlineLimits.flatMap((limit) =>
-		kindPreferences.map((matches) => ({ limit, matches }))
-	);
+	const passes = kindPreferences.map((matches) => ({ limit: roundLimit, matches }));
 
 	for (const { limit, matches } of passes) {
 		if (remaining <= 0) break;
