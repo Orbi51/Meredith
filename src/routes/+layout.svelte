@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount } from 'svelte';
+	import { dev } from '$app/environment';
 	import { page } from '$app/state';
 	import { enqueue, queueSize, startFlushing } from '$lib/offline-queue';
 	import type { LayoutData } from './$types';
@@ -56,9 +57,23 @@
 		});
 
 		if ('serviceWorker' in navigator) {
-			navigator.serviceWorker.register('/service-worker.js', { type: 'module' }).catch(() => {
-				/* the app works without it; offline support is the only loss */
-			});
+			if (dev) {
+				// In development a worker is a liability: when the dev server stops
+				// it cheerfully serves the last cached page, and you spend twenty
+				// minutes wondering why your edits do nothing. Skipping
+				// registration is not enough — one registered in a previous
+				// session is still there — so tear it down and drop its caches.
+				navigator.serviceWorker.getRegistrations().then((registrations) => {
+					for (const registration of registrations) registration.unregister();
+				});
+				caches?.keys().then((keys) => {
+					for (const key of keys) caches.delete(key);
+				});
+			} else {
+				navigator.serviceWorker.register('/service-worker.js', { type: 'module' }).catch(() => {
+					/* the app works without it; offline support is the only loss */
+				});
+			}
 		}
 
 		// Android and desktop offer a real install prompt.

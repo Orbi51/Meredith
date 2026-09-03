@@ -66,6 +66,10 @@ export const load: PageServerLoad = async (event) => {
 				kind: task.kind,
 				source: task.source,
 				deadline: task.deadline,
+				earliestStart: task.earliestStart,
+				dependsOnTaskId: task.dependsOnTaskId,
+				splittable: task.splittable,
+				minBlockMinutes: task.minBlockMinutes,
 				projectName: task.projectId ? (projectById.get(task.projectId)?.name ?? null) : null,
 				waitingReason: task.waitingReason,
 				// Raw and calibrated, always together. A silent multiplier destroys
@@ -94,7 +98,9 @@ export const actions: Actions = {
 
 		await updateTask(user.id, taskId, {
 			status: status as 'inbox' | 'active' | 'waiting' | 'done',
-			waitingReason: status === 'waiting' ? String(form.get('waitingReason') ?? '') || null : null,
+			// Leaving the reason alone here: the dropdown does not carry one, and
+			// blanking it every time the status is touched would lose what the
+			// user typed. The edit form owns the reason.
 			completedAt: status === 'done' ? new Date() : null
 		});
 
@@ -111,11 +117,31 @@ export const actions: Actions = {
 		const deadlineRaw = String(form.get('deadline') ?? '').trim();
 		const deadline = deadlineRaw ? new Date(deadlineRaw) : null;
 
+		const earliestRaw = String(form.get('earliestStart') ?? '').trim();
+		const earliestStart = earliestRaw ? new Date(earliestRaw) : null;
+
+		// A task cannot wait for itself. The scheduler has a cycle guard, but a
+		// plan that quietly drops a task is worse than a form that says no.
+		const dependsOn = String(form.get('dependsOnTaskId') ?? '') || null;
+		if (dependsOn === taskId) {
+			return fail(400, { message: 'A task cannot depend on itself.' });
+		}
+		if (dependsOn && (await wouldCycle(user.id, taskId, dependsOn))) {
+			return fail(400, { message: 'That would make two tasks wait for each other.' });
+		}
+
+		const minBlockRaw = String(form.get('minBlockMinutes') ?? '').trim();
+
 		await updateTask(user.id, taskId, {
 			title: String(form.get('title') ?? '').trim() || undefined,
 			estimateHours: estimateRaw ? Number(estimateRaw) : null,
 			deadline: deadline && !Number.isNaN(deadline.getTime()) ? deadline : null,
-			projectId: String(form.get('projectId') ?? '') || null
+			earliestStart: earliestStart && !Number.isNaN(earliestStart.getTime()) ? earliestStart : null,
+			projectId: String(form.get('projectId') ?? '') || null,
+			dependsOnTaskId: dependsOn,
+			splittable: form.get('splittable') === 'on',
+			minBlockMinutes: minBlockRaw ? Math.max(5, Number(minBlockRaw)) : undefined,
+			waitingReason: String(form.get('waitingReason') ?? '').trim() || null
 		});
 
 		await replanQuietly(user.id);
@@ -175,6 +201,23 @@ export const actions: Actions = {
 		};
 	}
 };
+
+/**
+ * Walk the dependency chain from `startAt` and report whether it leads back to
+ * `taskId`. Bounded by the number of tasks, so a chain that is already broken
+ * cannot spin forever.
+ */
+async function wouldCycle(userId: string, taskId: string, startAt: string): Promise<boolean> {
+	const all = await listTasks(userId);
+	const byId = new Map(all.map((task) => [task.id, task]));
+
+	let current: string | null = startAt;
+	for (let steps = 0; steps <= all.length && current; steps++) {
+		if (current === taskId) return true;
+		current = byId.get(current)?.dependsOnTaskId ?? null;
+	}
+	return false;
+}
 
 async function replanQuietly(userId: string) {
 	try {

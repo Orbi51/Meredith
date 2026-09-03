@@ -177,6 +177,66 @@
 										{/each}
 									</select>
 								</label>
+
+								<label class="block">
+									<span class="text-xs text-neutral-500">Not before</span>
+									<input
+										name="earliestStart"
+										type="datetime-local"
+										value={forInput(task.earliestStart)}
+										class="mt-1 rounded border border-neutral-300 px-2 py-1 text-sm"
+										title="The scheduler will not place this task before this moment — waiting on an asset, a brief, a delivery."
+									/>
+								</label>
+
+								<label class="block">
+									<span class="text-xs text-neutral-500">Wait for</span>
+									<select
+										name="dependsOnTaskId"
+										class="mt-1 max-w-56 rounded border border-neutral-300 px-2 py-1 text-sm"
+										title="This task will never be placed before the one it waits for has finished."
+									>
+										<option value="">nothing</option>
+										{#each data.tasks.filter((other) => other.id !== task.id) as other (other.id)}
+											<option value={other.id} selected={task.dependsOnTaskId === other.id}>
+												{other.title}
+											</option>
+										{/each}
+									</select>
+								</label>
+
+								<label class="block">
+									<span class="text-xs text-neutral-500">Smallest useful block</span>
+									<select
+										name="minBlockMinutes"
+										class="mt-1 rounded border border-neutral-300 px-2 py-1 text-sm"
+										title="A scheduler that chops modelling into 25-minute fragments produces a calendar that looks full and achieves nothing."
+									>
+										{#each [30, 60, 90, 120, 180, 240] as minutes (minutes)}
+											<option value={minutes} selected={task.minBlockMinutes === minutes}>
+												{minutes < 60 ? minutes + ' min' : minutes / 60 + 'h'}
+											</option>
+										{/each}
+									</select>
+								</label>
+
+								<label class="flex items-center gap-2 pb-1 text-sm">
+									<input type="checkbox" name="splittable" checked={task.splittable} />
+									<span title="Unticked, this task needs one unbroken stretch big enough for all of it.">
+										can be split
+									</span>
+								</label>
+
+								<label class="block">
+									<span class="text-xs text-neutral-500">Waiting on</span>
+									<input
+										name="waitingReason"
+										value={task.waitingReason ?? ''}
+										placeholder="client feedback"
+										class="mt-1 rounded border border-neutral-300 px-2 py-1 text-sm"
+									/>
+								</label>
+
 								<button class="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white">Save</button>
 							</form>
 							<form method="POST" action="?/remove" class="mt-2">
