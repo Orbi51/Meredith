@@ -4,3 +4,6 @@ node_modules
 .env
 .env.*
 !.env.example
+
+# Downloaded OAuth client credentials — never commit
+client_secret_*.json
