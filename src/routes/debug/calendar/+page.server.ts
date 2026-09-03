@@ -136,8 +136,11 @@ export const actions: Actions = {
 				detail: `${before.eventCount} events across ${before.calendarCount} calendars`
 			});
 
-			// 3. Create.
-			const start = new Date(Date.now() + 24 * 3_600_000);
+			// 3. Create. Times are rounded to the minute: Google stores event times
+			// to the second, so a start built from Date.now() comes back with its
+			// milliseconds shaved off and no round trip can ever compare equal.
+			// Real blocks always land on a whole minute anyway.
+			const start = new Date(Math.round((Date.now() + 24 * 3_600_000) / 60_000) * 60_000);
 			const end = new Date(start.getTime() + 2 * 3_600_000);
 			const inserted = await applySync(
 				auth,
@@ -188,13 +191,25 @@ export const actions: Actions = {
 				calendarId: targetCalendarId,
 				eventId
 			});
-			const movedCorrectly =
-				afterMove.data.id === eventId &&
-				new Date(afterMove.data.start?.dateTime ?? 0).getTime() === movedStart.getTime();
+			// Two separate claims, reported separately — a time that did not stick
+			// is a different bug from an event that was recreated.
+			const keptItsId = afterMove.data.id === eventId;
+			const landedTime = new Date(afterMove.data.start?.dateTime ?? 0);
+			const movedToTheRightTime = landedTime.getTime() === movedStart.getTime();
+
 			steps.push({
 				name: 'Moved the block by updating the same event id',
-				ok: movedCorrectly,
-				detail: movedCorrectly ? `${eventId} kept its id` : 'the event was recreated, not moved'
+				ok: keptItsId,
+				detail: keptItsId
+					? `${eventId} kept its id — updated in place, not recreated`
+					: `id changed: ${eventId} became ${afterMove.data.id}`
+			});
+			steps.push({
+				name: 'The new time stuck',
+				ok: movedToTheRightTime,
+				detail: movedToTheRightTime
+					? landedTime.toISOString()
+					: `asked for ${movedStart.toISOString()}, got ${landedTime.toISOString()}`
 			});
 
 			// 5. The guard: writing anywhere else must be refused.
