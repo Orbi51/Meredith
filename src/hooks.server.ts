@@ -16,6 +16,14 @@ import { env } from '$env/dynamic/private';
 import { AUTHORIZATION_PARAMS } from '$lib/server/google/client';
 import { encrypt } from '$lib/server/crypto';
 import { db, schema } from '$lib/server/db';
+import { startDailyJob } from '$lib/server/daily-job';
+
+// The plan picked an always-on Node process precisely so cron works without a
+// second service. Off by default in development, where a replan every morning
+// against the real calendar is not wanted.
+if (env.ENABLE_DAILY_JOB === 'true') {
+	startDailyJob(env.DAILY_JOB_TIMEZONE ?? 'Europe/Paris');
+}
 
 export const { handle, signIn, signOut } = SvelteKitAuth({
 	trustHost: true,

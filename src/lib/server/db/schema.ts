@@ -76,6 +76,20 @@ export const projects = pgTable('projects', {
 	agreedHours: doublePrecision('agreed_hours'),
 	/** Used with actual hours worked to show an effective hourly rate. */
 	agreedFee: doublePrecision('agreed_fee'),
+	/**
+	 * ISO 4217 code the fee is agreed in. Japanese clients bill in JPY; the
+	 * books are in EUR.
+	 */
+	currency: text('currency').notNull().default('EUR'),
+	/**
+	 * How many EUR one unit of `currency` buys. Frozen once set rather than
+	 * recomputed: for accounts, the rate that counts is the one on the invoice
+	 * date, not today's — and a fee that silently changes value every time the
+	 * page loads is not a number anyone can plan against.
+	 */
+	fxRateToEur: doublePrecision('fx_rate_to_eur'),
+	/** The date the stored rate is from (ECB reference rate). */
+	fxRateAt: text('fx_rate_at'),
 	status: projectStatus('status').notNull().default('active'),
 	color: text('color').notNull().default('#6366f1'),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()

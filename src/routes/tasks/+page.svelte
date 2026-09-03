@@ -193,37 +193,13 @@
 
 <section class="mt-10">
 	<h2 class="font-medium">Projects</h2>
-	<ul class="mt-2 space-y-1 text-sm">
+	<p class="mt-1 text-sm text-neutral-600">
+		Fees, currencies, agreed hours and hourly rates live on
+		<a class="underline" href="/projects">the projects page</a>.
+	</p>
+	<ul class="mt-2 flex flex-wrap gap-3 text-sm">
 		{#each data.projects as project (project.id)}
-			<li class="flex items-center gap-2">
-				<span>{project.name}</span>
-				<span class="text-xs text-neutral-400">{project.status}</span>
-				<form method="POST" action="?/archiveProject">
-					<input type="hidden" name="projectId" value={project.id} />
-					<button class="text-xs underline text-neutral-500">archive</button>
-				</form>
-			</li>
+			<li class="text-neutral-600">{project.name}</li>
 		{/each}
 	</ul>
-
-	<form method="POST" action="?/createProject" class="mt-3 flex flex-wrap items-end gap-2">
-		<label class="block">
-			<span class="text-xs text-neutral-500">New project</span>
-			<input name="name" class="mt-1 rounded border border-neutral-300 px-2 py-1 text-sm" />
-		</label>
-		<label class="block">
-			<span class="text-xs text-neutral-500">Client</span>
-			<input name="clientName" class="mt-1 rounded border border-neutral-300 px-2 py-1 text-sm" />
-		</label>
-		<label class="block">
-			<span class="text-xs text-neutral-500">Agreed fee (€)</span>
-			<input
-				name="agreedFee"
-				type="number"
-				step="1"
-				class="mt-1 w-28 rounded border border-neutral-300 px-2 py-1 text-sm"
-			/>
-		</label>
-		<button class="rounded border border-neutral-300 px-3 py-1.5 text-sm">Add</button>
-	</form>
 </section>

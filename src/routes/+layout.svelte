@@ -102,6 +102,7 @@
 		['/week', 'Week'],
 		['/plan', 'Plan'],
 		['/tasks', 'Tasks'],
+		['/projects', 'Projects'],
 		['/settings', 'Settings']
 	] as const;
 </script>
