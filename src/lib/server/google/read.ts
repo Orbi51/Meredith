@@ -177,13 +177,25 @@ function isGone(error: unknown): boolean {
  * no business knowing what the user is doing at 14:00. This is the one place
  * that needs the labels, because a human is reading them.
  */
+export type CalendarAppointment = {
+	start: Date;
+	end: Date;
+	summary: string;
+	allDay: boolean;
+	/** Google's event id — the handle we use to adopt an event exactly once. */
+	eventId: string;
+	calendarId: string;
+	/** True for the user's own primary calendar. */
+	primary: boolean;
+};
+
 export async function readAppointments(
 	auth: OAuth2Client,
 	options: BusyReadOptions
-): Promise<{ start: Date; end: Date; summary: string; allDay: boolean }[]> {
+): Promise<CalendarAppointment[]> {
 	const api = calendarApi(auth);
 	const calendars = await listCalendars(auth);
-	const appointments: { start: Date; end: Date; summary: string; allDay: boolean }[] = [];
+	const appointments: CalendarAppointment[] = [];
 
 	for (const calendar of calendars) {
 		if (!calendar.id || calendar.id === options.excludeCalendarId) continue;
@@ -205,11 +217,15 @@ export async function readAppointments(
 			const interval = eventToBusyInterval(event, options);
 			if (!interval) continue;
 
+			if (!event.id) continue;
 			appointments.push({
 				start: interval.start,
 				end: interval.end,
 				summary: event.summary ?? '(no title)',
-				allDay: Boolean(event.start?.date)
+				allDay: Boolean(event.start?.date),
+				eventId: event.id,
+				calendarId: calendar.id,
+				primary: Boolean(calendar.primary)
 			});
 		}
 	}

@@ -167,7 +167,10 @@ export async function getSchedulableTasks(
 		.where(
 			and(
 				eq(schema.tasks.userId, userId),
-				inArray(schema.tasks.status, [...SCHEDULABLE_STATUSES])
+				inArray(schema.tasks.status, [...SCHEDULABLE_STATUSES]),
+				// Work adopted from the calendar already has its slot. Scheduling
+				// it again would reserve a second one for the same job.
+				eq(schema.tasks.source, 'app')
 			)
 		)
 		.orderBy(asc(schema.tasks.createdAt));
@@ -219,7 +222,15 @@ export async function getFrozenBlocks(userId: string, now: Date): Promise<BlockR
 	return db
 		.select()
 		.from(schema.blocks)
-		.where(and(eq(schema.blocks.userId, userId), lte(schema.blocks.start, now)))
+		.where(
+			and(
+				eq(schema.blocks.userId, userId),
+				// Already started, OR mirroring an event on the user's own calendar.
+				// An external block is frozen at any time: the app does not own that
+				// event and has no business moving the work away from it.
+				or(lte(schema.blocks.start, now), eq(schema.blocks.source, 'external'))
+			)
+		)
 		.orderBy(asc(schema.blocks.start));
 }
 
@@ -232,7 +243,9 @@ export async function getFutureBlocks(userId: string, now: Date): Promise<BlockR
 			and(
 				eq(schema.blocks.userId, userId),
 				gte(schema.blocks.start, now),
-				eq(schema.blocks.status, 'planned')
+				eq(schema.blocks.status, 'planned'),
+				// Never a candidate for reuse or deletion — see getFrozenBlocks.
+				eq(schema.blocks.source, 'app')
 			)
 		)
 		.orderBy(asc(schema.blocks.start));
@@ -328,4 +341,26 @@ export async function tasksWithDeadlineBefore(userId: string, before: Date): Pro
 			)
 		)
 		.orderBy(asc(schema.tasks.deadline));
+}
+
+/**
+ * Every future block, ours and the ones mirroring the user's own calendar.
+ *
+ * `getFutureBlocks` deliberately excludes external blocks because a replan may
+ * not touch them. Anything that DISPLAYS how much of a task is scheduled needs
+ * both, or adopted work looks unplanned when its time is in fact already
+ * booked.
+ */
+export async function getAllFutureBlocks(userId: string, now: Date): Promise<BlockRow[]> {
+	return db
+		.select()
+		.from(schema.blocks)
+		.where(
+			and(
+				eq(schema.blocks.userId, userId),
+				gte(schema.blocks.start, now),
+				ne(schema.blocks.status, 'skipped')
+			)
+		)
+		.orderBy(asc(schema.blocks.start));
 }

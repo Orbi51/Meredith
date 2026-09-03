@@ -51,6 +51,14 @@
 						{/if}
 						{task.title}
 						<span class="ml-1 text-xs text-neutral-400">{task.kind}</span>
+						{#if task.source === 'calendar'}
+							<span
+								class="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-xs text-sky-800"
+								title="Adopted from your Google Calendar. Its time is fixed there, so the scheduler leaves it alone."
+							>
+								from calendar
+							</span>
+						{/if}
 						{#if task.waitingReason}
 							<span class="block text-xs text-amber-700">waiting: {task.waitingReason}</span>
 						{/if}
@@ -76,7 +84,10 @@
 
 					<td class="py-2">
 						{task.plannedHours}h
-						{#if task.status !== 'waiting' && task.plannedHours + task.hoursAlreadyDone < task.effectiveHours - 0.01}
+						{#if task.source === 'calendar'}
+							<span class="block text-xs text-neutral-400">fixed in your calendar</span>
+						{/if}
+						{#if task.source !== 'calendar' && task.status !== 'waiting' && task.plannedHours + task.hoursAlreadyDone < task.effectiveHours - 0.01}
 							<span class="block text-xs text-red-700">
 								{Math.round((task.effectiveHours - task.plannedHours - task.hoursAlreadyDone) * 100) /
 									100}h unplaced
@@ -102,12 +113,21 @@
 					</td>
 
 					<td class="py-2 text-right">
-						<button
-							class="text-xs underline"
-							onclick={() => (editing = editing === task.id ? null : task.id)}
-						>
-							{editing === task.id ? 'close' : 'edit'}
-						</button>
+						{#if task.source === 'calendar'}
+							<form method="POST" action="?/dismiss">
+								<input type="hidden" name="taskId" value={task.id} />
+								<button class="text-xs underline" title="Removes it here only — the calendar event stays">
+									remove
+								</button>
+							</form>
+						{:else}
+							<button
+								class="text-xs underline"
+								onclick={() => (editing = editing === task.id ? null : task.id)}
+							>
+								{editing === task.id ? 'close' : 'edit'}
+							</button>
+						{/if}
 					</td>
 				</tr>
 

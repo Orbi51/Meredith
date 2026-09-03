@@ -12,7 +12,7 @@ import {
 	createProject,
 	deleteTask,
 	getCalibrationSamples,
-	getFutureBlocks,
+	getAllFutureBlocks,
 	getSchedulableTasks,
 	getSettings,
 	listProjects,
@@ -22,6 +22,7 @@ import {
 } from '$lib/server/db/queries';
 import { buildCalibrationTable, effectiveEstimate } from '$lib/scheduler/calibration';
 import { replan } from '$lib/server/planner';
+import { dismissAdoptedTask } from '$lib/server/adopt';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
@@ -34,7 +35,8 @@ export const load: PageServerLoad = async (event) => {
 		getCalibrationSamples(user.id),
 		getSettings(user.id),
 		getSchedulableTasks(user.id, now),
-		getFutureBlocks(user.id, now)
+		// Both ours and the adopted ones: this is a display, not a replan.
+		getAllFutureBlocks(user.id, now)
 	]);
 
 	const calibration = buildCalibrationTable(samples);
@@ -62,6 +64,7 @@ export const load: PageServerLoad = async (event) => {
 				title: task.title,
 				status: task.status,
 				kind: task.kind,
+				source: task.source,
 				deadline: task.deadline,
 				projectName: task.projectId ? (projectById.get(task.projectId)?.name ?? null) : null,
 				waitingReason: task.waitingReason,
@@ -117,6 +120,15 @@ export const actions: Actions = {
 
 		await replanQuietly(user.id);
 		return { ok: true };
+	},
+
+	/** Take an adopted task out of the app. Google Calendar is not touched. */
+	dismiss: async (event) => {
+		const user = await requireUser(event);
+		const form = await event.request.formData();
+		const ok = await dismissAdoptedTask(user.id, String(form.get('taskId') ?? ''));
+		if (!ok) return fail(400, { message: 'That task did not come from the calendar.' });
+		return { ok: true, message: 'Removed here. The calendar event is untouched.' };
 	},
 
 	remove: async (event) => {

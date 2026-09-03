@@ -94,6 +94,16 @@ export const tasks = pgTable('tasks', {
 	waitingReason: text('waiting_reason'),
 	/** ISO week, e.g. "2026-W37". Set during the Monday ritual. */
 	committedToWeek: text('committed_to_week'),
+	/**
+	 * 'app' for tasks captured here, 'calendar' for work adopted from an event
+	 * already in Google Calendar. Adopted tasks are shown differently and their
+	 * time is fixed — the app never moves an event it does not own.
+	 */
+	source: text('source', { enum: ['app', 'calendar'] })
+		.notNull()
+		.default('app'),
+	/** The Google event this task was adopted from. Null for app-created tasks. */
+	sourceEventId: text('source_event_id'),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 	completedAt: timestamp('completed_at', { withTimezone: true })
 });
@@ -116,6 +126,14 @@ export const blocks = pgTable('blocks', {
 	status: blockStatus('status').notNull().default('planned'),
 	/** Filled in on confirmation; feeds the calibration samples. */
 	actualMinutes: integer('actual_minutes'),
+	/**
+	 * 'app' — we created this event on our own calendar and may move or delete
+	 * it. 'external' — it mirrors an event on one of the user's own calendars.
+	 * External blocks are never written to, moved or deleted by a replan.
+	 */
+	source: text('source', { enum: ['app', 'external'] })
+		.notNull()
+		.default('app'),
 	pool: text('pool').notNull().default('human')
 });
 
@@ -156,3 +174,19 @@ export const taskRelations = relations(tasks, ({ one, many }) => ({
 export const blockRelations = relations(blocks, ({ one }) => ({
 	task: one(tasks, { fields: [blocks.taskId], references: [tasks.id] })
 }));
+
+/**
+ * Calendar events the user has told us not to adopt.
+ *
+ * Dismissing an imported task removes it from the app and records the event
+ * here, so the next automatic import does not bring it straight back. The
+ * event itself is never touched — it stays in Google Calendar as capacity.
+ */
+export const ignoredEvents = pgTable('ignored_events', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	userId: uuid('user_id')
+		.notNull()
+		.references(() => users.id, { onDelete: 'cascade' }),
+	googleEventId: text('google_event_id').notNull(),
+	ignoredAt: timestamp('ignored_at', { withTimezone: true }).notNull().defaultNow()
+});

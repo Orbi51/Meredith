@@ -32,7 +32,8 @@ import { buildCalibrationTable } from '$lib/scheduler/calibration';
 import { effectiveEstimate, schedule } from '$lib/scheduler';
 import type { SchedulerInput, SchedulerOutput } from '$lib/scheduler/types';
 import { clientForUser } from './google/client';
-import { readBusyIntervals } from './google/read';
+import { readAppointments, readBusyIntervals } from './google/read';
+import { adoptCalendarWork } from './adopt';
 import {
 	applySync,
 	ensureTargetCalendar,
@@ -114,12 +115,25 @@ export async function replan(userId: string, options: ReplanOptions = {}): Promi
 			if (targetCalendarId !== settings.targetCalendarId) {
 				await updateSettings(userId, { targetCalendarId });
 			}
-			busyIntervals = await readBusyIntervals(auth, {
+			// One read serves both purposes: the busy intervals the scheduler needs,
+			// and the events we adopt as tasks.
+			const appointments = await readAppointments(auth, {
 				timeMin: now,
 				timeMax: new Date(now.getTime() + settings.horizonDays * 24 * 3_600_000),
 				excludeCalendarId: targetCalendarId,
 				timezone: settings.timezone
 			});
+			busyIntervals = appointments.map((a) => ({ start: a.start, end: a.end }));
+
+			// Adopt work the user scheduled by hand before planning around it, so
+			// this run already accounts for it.
+			await adoptCalendarWork(
+				userId,
+				appointments,
+				await listProjects(userId),
+				settings.timezone,
+				now
+			);
 		} catch (error) {
 			// A calendar that cannot be read is a reason to plan with less
 			// information, not a reason to refuse to plan at all.
@@ -246,6 +260,10 @@ async function pushToCalendar(
 
 	const desired: DesiredEvent[] = [];
 	for (const block of blocks) {
+		// An external block mirrors an event on the user's own calendar. Putting
+		// it in the sync would create a duplicate on OUR calendar — and, worse,
+		// make the app think it owns the original.
+		if (block.source === 'external') continue;
 		const task = taskById.get(block.taskId);
 		if (!task) continue; // a frozen block whose task is done — leave it alone
 

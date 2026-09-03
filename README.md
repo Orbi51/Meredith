@@ -97,6 +97,22 @@ the current time as an argument and returns blocks; that is what makes the
 whole of it testable against fixtures in milliseconds. Every change to it comes
 with a test.
 
+## Work adopted from Google Calendar
+
+Events you scheduled by hand — anything titled `Project - task` — are adopted
+automatically as tasks, so the app is the only place you have to look. The
+event itself is never touched:
+
+- it stays on your calendar, at its time, and a replan will never move,
+  rewrite or delete it (the Phase 0 guarantee is unaffected);
+- the work is never scheduled a second time, because its slot already exists;
+- an appointment is not a task. `Rendez-vous chez Dr…`, `Osteo` and
+  `Morning Planning` stay pure capacity — only the dash convention adopts.
+
+Adopted tasks are marked *from calendar* and can be removed here with
+**remove**, which forgets the event rather than deleting it. Verified against
+a real event: `UNTOUCHED: true`.
+
 ## Three things worth knowing about the scheduler
 
 **Slack, not deadlines, drives priority.** A task is ordered by how many
