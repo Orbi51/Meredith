@@ -180,7 +180,8 @@ tool.
 
 Honest list, in rough order of how much they matter.
 
-- **Deployment.** The app runs on your machine only. See §5.
+- **Deployment.** Ported to Netlify and building cleanly, but not yet deployed
+  — that needs your account. The checklist is in the README.
 - **Incremental calendar sync.** §7 of the plan asks for `syncToken`-based
   sync. `detectChanges()` and the `settings.syncToken` column exist but nothing
   calls them — every replan does a full read of all calendars (~1.2s for 7

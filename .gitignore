@@ -7,3 +7,6 @@ node_modules
 
 # Downloaded OAuth client credentials — never commit
 client_secret_*.json
+
+# Netlify build output and local state
+.netlify
