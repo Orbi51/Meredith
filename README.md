@@ -29,9 +29,35 @@ npm test          # the scheduler suite — needs no credentials
 npm run dev       # http://localhost:5173
 ```
 
-`ANTHROPIC_API_KEY` is optional. Without it, quick capture saves what you typed
-as a title-only task instead of parsing it — §8 says input is never rejected,
-and that includes when the parser is unavailable.
+### The language model is optional
+
+`LLM_PROVIDER` is `none`, `ollama` or `anthropic`. It defaults to `ollama` with
+`qwen3:4b`, so the app costs nothing to run and nothing leaves the machine.
+
+Dates, durations and kind are **never** sent to a model — they are extracted in
+code (`src/lib/server/parse/deterministic.ts`, 24 tests). Local 7B models were
+measured getting weekdays wrong by a week and inventing deadlines that were
+never typed, and a wrong deadline is worse than none when the whole app rests
+on deadlines being true.
+
+That leaves the model two jobs: tidy the title, spot a project name. Measured
+on ten real captures:
+
+| model | titles | project (after validation) | avg |
+|---|---|---|---|
+| qwen3:4b | 10/10 | 10/10 | 0.3s |
+| mistral:7b | 10/10 | 10/10 | 0.4s |
+
+The aggregate hides the deciding factor: **mistral translates French captures
+into English** (5 of 6 rewritten, accents dropped), while qwen3:4b returns them
+verbatim. Hence the default.
+
+Both models hallucinate a project roughly half the time — they will cheerfully
+attach the first project on the list to "fix the thing". The app only believes
+a suggested project whose name actually appears in what you typed, which is
+what turns a raw 4/10 into 10/10.
+
+With `LLM_PROVIDER=none` capture still works; you lose title tidying only.
 
 `/debug` runs the scheduler over a fixture scenario and renders the result. It
 needs no database, so it works before any of the setup below.

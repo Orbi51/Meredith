@@ -97,22 +97,31 @@ async function callOllama(request: LlmRequest): Promise<LlmResponse | null> {
 	// has to feel instant or the user stops capturing.
 	const timeout = setTimeout(() => controller.abort(), Number(env.LLM_TIMEOUT_MS ?? 8000));
 
+	const payload = {
+		model,
+		stream: false,
+		format: RESPONSE_SCHEMA,
+		options: { temperature: 0 },
+		messages: [
+			{ role: 'system', content: SYSTEM },
+			{ role: 'user', content: userPrompt(request) }
+		]
+	};
+
 	try {
-		const response = await fetch(`${host}/api/chat`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			signal: controller.signal,
-			body: JSON.stringify({
-				model,
-				stream: false,
-				format: RESPONSE_SCHEMA,
-				options: { temperature: 0 },
-				messages: [
-					{ role: 'system', content: SYSTEM },
-					{ role: 'user', content: userPrompt(request) }
-				]
-			})
-		});
+		const post = (body: object) =>
+			fetch(`${host}/api/chat`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				signal: controller.signal,
+				body: JSON.stringify(body)
+			});
+
+		// Hybrid reasoning models (qwen3 and friends) will happily spend several
+		// seconds thinking about a job this small. Turn it off — but older models
+		// reject the field outright, so fall back if they complain.
+		let response = await post({ ...payload, think: false });
+		if (!response.ok) response = await post(payload);
 
 		if (!response.ok) return null;
 		const body = (await response.json()) as { message?: { content?: string } };
