@@ -16,6 +16,7 @@
 import { formatInTimeZone } from 'date-fns-tz';
 import type { TaskKind } from '$lib/scheduler/types';
 import { detectKind, extractDeadline, extractEstimate, stripMatches } from './deterministic';
+import { looksStructured, parseStructured } from './structured';
 import { activeProvider, callModel } from './providers';
 
 export type ParsedTask = {
@@ -28,8 +29,10 @@ export type ParsedTask = {
 	deadline: Date | null;
 	kind: TaskKind;
 	/** How the result was arrived at, shown to the user. */
-	source: 'deterministic' | 'model-assisted';
+	source: 'structured' | 'deterministic' | 'model-assisted';
 	note: string | null;
+	/** Extra prose from a structured capture, offered as the task's notes. */
+	notes: string | null;
 };
 
 export type ProjectChoice = { id: string; name: string; clientName: string | null };
@@ -48,7 +51,20 @@ export async function parseQuickAdd(
 			deadline: null,
 			kind: 'creative',
 			source: 'deterministic',
-			note: null
+			note: null,
+			notes: null
+		};
+	}
+
+	// The dash format says what each field is, so there is nothing left to
+	// infer. No model is consulted: it could only make this worse, and slower.
+	if (looksStructured(trimmed)) {
+		const structured = parseStructured(trimmed, options);
+		return {
+			...structured,
+			title: structured.title.slice(0, 200),
+			source: 'structured',
+			note: describe(structured.estimateHours, structured.deadline, options.timezone)
 		};
 	}
 
@@ -118,7 +134,8 @@ export async function parseQuickAdd(
 		deadline: deadline?.value ?? null,
 		kind: kind?.value ?? 'creative',
 		source,
-		note: describe(estimate?.value ?? null, deadline?.value ?? null, options.timezone)
+		note: describe(estimate?.value ?? null, deadline?.value ?? null, options.timezone),
+		notes: null
 	};
 }
 

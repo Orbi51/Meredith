@@ -29,6 +29,12 @@
 	<p class="mt-2 text-xs text-neutral-500">
 		Type it however you like. Nothing is mandatory — a title on its own is a valid task.
 	</p>
+	<p class="mt-3 text-xs text-neutral-500">
+		For no ambiguity at all, separate the fields with dashes:
+		<code class="rounded bg-neutral-100 px-1">Project - task - time - deadline</code>.
+		Order is flexible and any field can be left out. Dashes inside words
+		(<code>rev-2</code>, <code>e-mail</code>) are left alone.
+	</p>
 {:else}
 	<p class="mt-2 text-sm text-neutral-500">
 		From: <span class="font-mono">{data.text}</span>
@@ -38,7 +44,11 @@
 	{#if data.parsed.note}
 		<p class="mt-3 rounded bg-neutral-100 p-3 text-sm text-neutral-700">
 			{data.parsed.note}
-			<span class="ml-1 text-xs text-neutral-500">({data.parsed.source})</span>
+			<span class="ml-1 text-xs text-neutral-500">
+				({data.parsed.source === 'structured'
+					? 'from the dash format — no guessing'
+					: data.parsed.source})
+			</span>
 		</p>
 	{/if}
 
@@ -128,7 +138,7 @@
 				name="notes"
 				rows="2"
 				class="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
-			></textarea>
+				>{data.parsed.notes ?? ''}</textarea>
 		</label>
 
 		{#if form?.message}

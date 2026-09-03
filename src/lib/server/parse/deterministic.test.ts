@@ -19,6 +19,8 @@ describe('extractEstimate', () => {
 		['call 45 minutes', 0.75],
 		['modelling 2 days', 14],
 		['modelling 3 jours', 21],
+		['modélisation 2j', 14],
+		['modelling 2d', 14],
 		['retouches demi-journée', 3.5]
 	])('reads %s as %s hours', (text, expected) => {
 		expect(extractEstimate(text)?.value).toBe(expected);

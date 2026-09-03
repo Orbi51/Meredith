@@ -78,8 +78,9 @@ export function extractEstimate(text: string): Extraction<number> {
 		return { value: Number(minutes[1]) / 60, matched: minutes[0] };
 	}
 
-	// "2 days", "3 jours", "1 journée"
-	const days = text.match(/(?<![\w.])~?\s*(\d+(?:[.,]\d+)?)\s*(?:d|days?|jours?|journées?|journees?)(?![\w])/i);
+	// "2 days", "3 jours", "1 journée", "2j" — the French shorthand is common
+	// enough in a freelancer's own notes to be worth supporting.
+	const days = text.match(/(?<![\w.])~?\s*(\d+(?:[.,]\d+)?)\s*(?:d|j|days?|jours?|journées?|journees?)(?![\w])/i);
 	if (days) {
 		const value = Number((days[1] as string).replace(',', '.')) * HOURS_PER_WORKING_DAY;
 		return { value, matched: days[0] };

@@ -61,7 +61,7 @@
 			<input
 				bind:this={quickAdd}
 				name="text"
-				placeholder="storyboard rev2 Studio X ~6h friday        (Ctrl+K)"
+				placeholder="storyboard rev2 Studio X ~6h friday   ·   or  Project - task - 6h - friday   (Ctrl+K)"
 				class="w-full rounded border border-neutral-300 px-3 py-2 text-sm"
 			/>
 			<button class="rounded bg-neutral-900 px-3 py-2 text-sm whitespace-nowrap text-white">
