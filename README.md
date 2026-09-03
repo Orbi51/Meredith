@@ -7,6 +7,10 @@ app's job is to say — weeks early — when the committed work does not fit.
 The specification is [productivity-app-plan.md](productivity-app-plan.md). Read
 it before changing anything; this README only covers how to run the thing.
 
+[NOTES.md](NOTES.md) is the field guide: the traps, the decisions that look
+like bugs, and what is honestly not built yet. Read it before you spend an
+afternoon on something already understood.
+
 ## Status
 
 | Phase | State |
