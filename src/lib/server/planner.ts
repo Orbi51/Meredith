@@ -302,3 +302,44 @@ async function pushToCalendar(
 function baseUrl(): string {
 	return process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173';
 }
+
+/**
+ * Compute the plan WITHOUT persisting anything or touching Google.
+ *
+ * §9 step 6 is explicit: never write to the calendar without showing a preview
+ * first. This is what the preview renders. It still reads the calendar, so the
+ * preview reflects real appointments rather than an optimistic empty week.
+ */
+export async function previewPlan(
+	userId: string,
+	options: { now?: Date } = {}
+): Promise<{ output: SchedulerOutput; input: SchedulerInput; warnings: string[] }> {
+	const now = options.now ?? new Date();
+	const warnings: string[] = [];
+
+	const settings = await getSettings(userId);
+	if (!settings) throw new Error('No settings row for this user.');
+
+	const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+
+	let busyIntervals: { start: Date; end: Date }[] = [];
+	if (user?.googleRefreshToken) {
+		try {
+			const auth = clientForUser(user.googleRefreshToken);
+			busyIntervals = await readBusyIntervals(auth, {
+				timeMin: now,
+				timeMax: new Date(now.getTime() + settings.horizonDays * 24 * 3_600_000),
+				excludeCalendarId: settings.targetCalendarId,
+				timezone: settings.timezone
+			});
+		} catch (error) {
+			warnings.push(
+				`Could not read Google Calendar: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	}
+
+	const frozen = await getFrozenBlocks(userId, now);
+	const input = await buildSchedulerInput(userId, now, busyIntervals, frozen, settings);
+	return { output: schedule(input), input, warnings };
+}

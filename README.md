@@ -14,7 +14,7 @@ it before changing anything; this README only covers how to run the thing.
 | 0 — Plumbing | **Done.** Verified against the real account: block created, moved and deleted, every other calendar byte-identical |
 | 1 — Scheduler | **Done.** Pure module, 53 tests, including determinism and DST |
 | 2 — Core app | **Built**, awaiting a real week of use — that is the threshold |
-| 3 — Ritual and calibration | Calibration maths done and tested; the Monday flow is not built |
+| 3 — Ritual and calibration | **Built.** The six-step Monday flow at `/plan`; threshold is four weeks of samples showing calibrated estimates beating raw ones |
 | 4 — PWA and freelance layer | Not started |
 
 Phase 2 gives you: quick capture with LLM parsing (`Ctrl+K`), task and project

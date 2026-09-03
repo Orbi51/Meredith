@@ -48,7 +48,13 @@ export const settings = pgTable('settings', {
 	weeklyCapacityHours: doublePrecision('weekly_capacity_hours').notNull().default(35),
 	defaultBufferPercent: integer('default_buffer_percent').notNull().default(0),
 	calibrationEnabled: boolean('calibration_enabled').notNull().default(true),
-	horizonDays: integer('horizon_days').notNull().default(21)
+	horizonDays: integer('horizon_days').notNull().default(21),
+	/**
+	 * ISO week of the last completed Monday ritual, e.g. "2026-W37". The app
+	 * opens straight to /plan on Monday mornings until this matches the current
+	 * week.
+	 */
+	ritualCompletedWeek: text('ritual_completed_week')
 });
 
 export const projects = pgTable('projects', {

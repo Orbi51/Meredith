@@ -4,7 +4,7 @@
  * become impossible.
  */
 
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { formatInTimeZone } from 'date-fns-tz';
 import { currentUser } from '$lib/server/auth';
 import {
@@ -31,6 +31,16 @@ export const load: PageServerLoad = async (event) => {
 	const settings = await getSettings(event.locals.userId ? event.locals.userId : user.id);
 	const timezone = settings?.timezone ?? 'Europe/Paris';
 	const now = new Date();
+
+	// §9: the app opens directly to the ritual on Monday mornings until it has
+	// been completed for the current week. Only Monday, and only before midday —
+	// a ritual that ambushes you on Thursday is just an obstacle.
+	const isoDayOfWeek = Number(formatInTimeZone(now, timezone, 'i'));
+	const hourOfDay = Number(formatInTimeZone(now, timezone, 'H'));
+	const currentWeek = formatInTimeZone(now, timezone, "RRRR-'W'II");
+	if (isoDayOfWeek === 1 && hourOfDay < 12 && settings?.ritualCompletedWeek !== currentWeek) {
+		redirect(303, '/plan');
+	}
 
 	// "Today" is a civil day in the user's timezone, not a 24-hour window.
 	const civilToday = formatInTimeZone(now, timezone, 'yyyy-MM-dd');

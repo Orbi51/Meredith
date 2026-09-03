@@ -21,6 +21,7 @@
 	const links = [
 		['/', 'Today'],
 		['/week', 'Week'],
+		['/plan', 'Plan'],
 		['/tasks', 'Tasks'],
 		['/settings', 'Settings']
 	] as const;

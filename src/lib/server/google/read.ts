@@ -169,3 +169,50 @@ function isGone(error: unknown): boolean {
 		(error as { code: unknown }).code === 410
 	);
 }
+
+/**
+ * Appointments with their titles, for the ritual's "fixed commitments" step.
+ *
+ * `readBusyIntervals` deliberately returns only intervals — the scheduler has
+ * no business knowing what the user is doing at 14:00. This is the one place
+ * that needs the labels, because a human is reading them.
+ */
+export async function readAppointments(
+	auth: OAuth2Client,
+	options: BusyReadOptions
+): Promise<{ start: Date; end: Date; summary: string; allDay: boolean }[]> {
+	const api = calendarApi(auth);
+	const calendars = await listCalendars(auth);
+	const appointments: { start: Date; end: Date; summary: string; allDay: boolean }[] = [];
+
+	for (const calendar of calendars) {
+		if (!calendar.id || calendar.id === options.excludeCalendarId) continue;
+
+		const response = await api.events.list({
+			calendarId: calendar.id,
+			timeMin: options.timeMin.toISOString(),
+			timeMax: options.timeMax.toISOString(),
+			singleEvents: true,
+			orderBy: 'startTime',
+			maxResults: 2500
+		});
+
+		for (const event of response.data.items ?? []) {
+			// An event marked "free" is not a commitment, whatever it says.
+			if (event.transparency === 'transparent') continue;
+			if (event.status === 'cancelled') continue;
+
+			const interval = eventToBusyInterval(event, options);
+			if (!interval) continue;
+
+			appointments.push({
+				start: interval.start,
+				end: interval.end,
+				summary: event.summary ?? '(no title)',
+				allDay: Boolean(event.start?.date)
+			});
+		}
+	}
+
+	return appointments.sort((a, b) => a.start.getTime() - b.start.getTime());
+}
