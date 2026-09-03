@@ -48,6 +48,34 @@ describe('extractDeadline', () => {
 		);
 	});
 
+	it('reads "prochain" as next week, not tomorrow', () => {
+		// NOW is a Thursday. "vendredi" is tomorrow, the 4th; "vendredi prochain"
+		// is the Friday of next week, the 11th. Anyone meaning tomorrow says
+		// "demain". Getting this wrong by a week is the failure that makes a
+		// planner untrustworthy.
+		expect(civilOf(extractDeadline('storyboard vendredi', NOW, TZ)!.value)).toBe(
+			'2026-09-04 18:00'
+		);
+		expect(civilOf(extractDeadline('storyboard vendredi prochain', NOW, TZ)!.value)).toBe(
+			'2026-09-11 18:00'
+		);
+		expect(civilOf(extractDeadline('storyboard next friday', NOW, TZ)!.value)).toBe(
+			'2026-09-11 18:00'
+		);
+	});
+
+	it('reads "next sunday" as the end of next week', () => {
+		// Sunday closes the week rather than opening it, so "next sunday" on a
+		// Thursday is ten days out, not three.
+		expect(civilOf(extractDeadline('x next sunday', NOW, TZ)!.value)).toBe('2026-09-13 18:00');
+		expect(civilOf(extractDeadline('x sunday', NOW, TZ)!.value)).toBe('2026-09-06 18:00');
+	});
+
+	it('reads "next thursday" as a week away when today is Thursday', () => {
+		expect(civilOf(extractDeadline('x next thursday', NOW, TZ)!.value)).toBe('2026-09-10 18:00');
+		expect(civilOf(extractDeadline('x thursday', NOW, TZ)!.value)).toBe('2026-09-03 18:00');
+	});
+
 	it('handles today and tomorrow in both languages', () => {
 		expect(civilOf(extractDeadline('x today', NOW, TZ)!.value)).toBe('2026-09-03 18:00');
 		expect(civilOf(extractDeadline('x demain', NOW, TZ)!.value)).toBe('2026-09-04 18:00');

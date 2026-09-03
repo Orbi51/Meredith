@@ -174,14 +174,21 @@ export function extractDeadline(text: string, now: Date, timezone: string): Extr
  */
 export function nextWeekday(todayCivil: string, target: number, explicitlyNext: boolean): string {
 	const todayDow = civilDayOfWeek(todayCivil);
-	let delta = (target - todayDow + 7) % 7;
-	if (explicitlyNext && delta === 0) delta = 7;
-	if (explicitlyNext && delta > 0) {
-		// "next friday" on a Monday is this coming Friday for most people; only
-		// bump a whole week when the day has already passed this week.
-		return addCivilDays(todayCivil, delta);
+
+	if (!explicitlyNext) {
+		// Bare "friday": the next one to come round, today included.
+		return addCivilDays(todayCivil, (target - todayDow + 7) % 7);
 	}
-	return addCivilDays(todayCivil, delta);
+
+	// "next friday" / "vendredi prochain": the Friday of NEXT week, not the one
+	// that happens to be tomorrow. Said on a Thursday, "vendredi prochain" is
+	// eight days away — anyone meaning tomorrow says "demain".
+	//
+	// Weeks run Monday to Sunday, so this is: find next Monday, then step to
+	// the target day within that week.
+	const daysToNextMonday = ((1 - todayDow + 7) % 7) || 7;
+	const offsetWithinWeek = (target - 1 + 7) % 7; // Monday = 0 ... Sunday = 6
+	return addCivilDays(todayCivil, daysToNextMonday + offsetWithinWeek);
 }
 
 /** Keyword classification. Returns null when nothing in the text decides it. */
