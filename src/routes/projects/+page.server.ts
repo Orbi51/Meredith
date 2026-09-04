@@ -19,11 +19,12 @@ export const load: PageServerLoad = async (event) => {
 	const user = await requireUser(event);
 	const settings = await getSettings(user.id);
 	const hoursPerDay = settings?.hoursPerDay ?? 7;
+	const standardDayRate = settings?.defaultDayRateEur ?? null;
 
 	const [economics, rows] = await Promise.all([
 		// The day length comes from settings so that "2j" in a capture and
 		// "€/day" here can never mean different things.
-		projectEconomics(user.id, hoursPerDay),
+		projectEconomics(user.id, hoursPerDay, standardDayRate),
 		db.select().from(schema.projects).where(eq(schema.projects.userId, user.id))
 	]);
 
@@ -33,6 +34,7 @@ export const load: PageServerLoad = async (event) => {
 		currencies: CURRENCIES,
 		timezone: settings?.timezone ?? 'Europe/Paris',
 		hoursPerDay,
+		standardDayRate,
 		// Everything money-related comes from projectEconomics, which is the one
 		// place currency conversion happens. Only presentation fields are added.
 		projects: economics.map((project) => {
@@ -84,18 +86,27 @@ export const actions: Actions = {
 		// A job quoted as "5 days at 500 a day" is entered that way. The fee is
 		// what gets invoiced, so it is still what we store — computed here rather
 		// than making the user do the multiplication.
+		const billing = String(form.get('billing') ?? 'fixed') === 'day_rate' ? 'day_rate' : 'fixed';
 		const dayRate = number('dayRate');
 		const agreedDays = number('agreedDays');
+
+		// A fixed-price job quoted as "5 days at 450" still invoices 2250, so the
+		// fee is the product. A day-rate job has no agreed total at all — what it
+		// bills depends on how many days it takes — so we do not invent one.
 		const feeFromDays =
-			dayRate !== null && agreedDays !== null ? Math.round(dayRate * agreedDays * 100) / 100 : null;
+			billing === 'fixed' && dayRate !== null && agreedDays !== null
+				? Math.round(dayRate * agreedDays * 100) / 100
+				: null;
 
 		const status = String(form.get('status') ?? 'active');
 		const values: Partial<typeof schema.projects.$inferInsert> = {
 			name: String(form.get('name') ?? '').trim() || undefined,
 			clientName: String(form.get('clientName') ?? '').trim() || null,
-			agreedFee: feeFromDays ?? number('agreedFee'),
+			agreedFee: billing === 'day_rate' ? null : (feeFromDays ?? number('agreedFee')),
 			agreedHours: number('agreedHours'),
 			agreedDays,
+			billing,
+			dayRate,
 			currency,
 			deadline: deadline && !Number.isNaN(deadline.getTime()) ? deadline : null,
 			color: String(form.get('color') ?? '') || undefined,

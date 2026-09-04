@@ -29,8 +29,21 @@ export type ProjectEconomics = {
 	agreedHours: number | null;
 	/** Days sold, when the job was quoted as a day rate. */
 	agreedDays: number | null;
-	/** The rate that was quoted: fee ÷ days sold. What you told the client. */
+	billing: 'fixed' | 'day_rate';
+	/** The agreed day rate, in euros. Day-rate jobs only. */
+	dayRateEur: number | null;
+	/** The rate that was quoted: fee ÷ days sold. Fixed-price jobs only. */
 	quotedDayRateEur: number | null;
+	/**
+	 * What the job is expected to bill in total.
+	 *
+	 * Fixed price: the agreed fee, whatever it ends up costing you. Day rate:
+	 * the rate times the days worked and still planned — which GROWS with the
+	 * work rather than being eaten by it.
+	 */
+	expectedRevenueEur: number | null;
+	/** Below the rate you normally ask for. Only meaningful once work is done. */
+	belowStandardRate: boolean;
 	/** Hours actually worked: confirmed blocks, using their recorded actuals. */
 	actualHours: number;
 	/** Hours still planned but not yet worked. */
@@ -62,7 +75,8 @@ export type ProjectEconomics = {
 
 export async function projectEconomics(
 	userId: string,
-	hoursPerDay = 7
+	hoursPerDay = 7,
+	standardDayRateEur: number | null = null
 ): Promise<ProjectEconomics[]> {
 	const projects = await db
 		.select()
@@ -117,12 +131,34 @@ export async function projectEconomics(
 			const asDayRate = (hourly: number | null) =>
 				hourly === null ? null : round(hourly * perDay);
 
-			const effectiveRateEur =
-				feeEur !== null && actualHours > 0 ? round(feeEur / actualHours) : null;
-			const projectedRateEur =
-				feeEur !== null && actualHours + plannedHours > 0
+			const actualDays = round(actualHours / perDay);
+			const plannedDays = round(plannedHours / perDay);
+			const dayRateEur = toEur(project.dayRate, project.fxRateToEur, project.currency);
+			const billedByTheDay = project.billing === 'day_rate' && dayRateEur !== null;
+
+			// A day-rate job earns its rate by definition — the question is not
+			// "what did this work out at" but "how many days will I bill".
+			// A fixed fee is the opposite: the rate is whatever is left after the
+			// work took as long as it took.
+			const effectiveRateEur = billedByTheDay
+				? round(dayRateEur / perDay)
+				: feeEur !== null && actualHours > 0
+					? round(feeEur / actualHours)
+					: null;
+
+			const projectedRateEur = billedByTheDay
+				? round(dayRateEur / perDay)
+				: feeEur !== null && actualHours + plannedHours > 0
 					? round(feeEur / (actualHours + plannedHours))
 					: null;
+
+			const expectedRevenueEur = billedByTheDay
+				? round(dayRateEur * (actualDays + plannedDays))
+				: feeEur;
+
+			// Compare like with like: the projected day rate is what this job is
+			// actually going to have earned per day.
+			const projectedDay = projectedRateEur === null ? null : round(projectedRateEur * perDay);
 
 			return {
 				projectId: project.id,
@@ -136,14 +172,22 @@ export async function projectEconomics(
 				feeEur,
 				agreedHours: project.agreedHours,
 				agreedDays: project.agreedDays,
+				billing: project.billing,
+				dayRateEur,
 				// What was quoted, as opposed to what it is turning out to be.
 				quotedDayRateEur:
-					feeEur !== null && project.agreedDays && project.agreedDays > 0
+					!billedByTheDay && feeEur !== null && project.agreedDays && project.agreedDays > 0
 						? round(feeEur / project.agreedDays)
 						: null,
+				expectedRevenueEur,
+				belowStandardRate:
+					standardDayRateEur !== null &&
+					projectedDay !== null &&
+					actualHours + plannedHours > 0 &&
+					projectedDay < standardDayRateEur,
 				actualHours,
 				plannedHours,
-				actualDays: round(actualHours / perDay),
+				actualDays,
 				// Dividing by zero hours would report an infinite rate on a project
 				// nobody has worked yet, which is worse than saying nothing.
 				effectiveRateEur,

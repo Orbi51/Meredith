@@ -38,6 +38,7 @@ export const load: PageServerLoad = async (event) => {
 			timezone: settings?.timezone ?? 'Europe/Paris',
 			horizonDays: settings?.horizonDays ?? 21,
 			hoursPerDay: settings?.hoursPerDay ?? 7,
+			defaultDayRateEur: settings?.defaultDayRateEur ?? null,
 			targetCalendarId: settings?.targetCalendarId ?? null,
 			calibrationEnabled: settings?.calibrationEnabled ?? true
 		},
@@ -92,12 +93,15 @@ export const actions: Actions = {
 
 		const horizon = Number(form.get('horizonDays') ?? 21);
 		const perDay = Number(form.get('hoursPerDay') ?? 7);
+		const rawRate = String(form.get('defaultDayRateEur') ?? '').trim();
+		const standardRate = rawRate ? Number(rawRate) : null;
 		await updateSettings(user.id, {
 			timezone: String(form.get('timezone') ?? 'Europe/Paris'),
 			horizonDays: Number.isFinite(horizon) ? Math.min(90, Math.max(1, horizon)) : 21,
 			// Clamped: a zero would divide by zero in every rate on the projects
 			// page, and a 24-hour day is not a day.
-			hoursPerDay: Number.isFinite(perDay) ? Math.min(16, Math.max(1, perDay)) : 7
+			hoursPerDay: Number.isFinite(perDay) ? Math.min(16, Math.max(1, perDay)) : 7,
+			defaultDayRateEur: standardRate !== null && standardRate > 0 ? standardRate : null
 		});
 
 		try {

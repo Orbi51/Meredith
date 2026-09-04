@@ -18,10 +18,12 @@
 
 <h1 class="text-xl font-semibold">Projects</h1>
 <p class="mt-1 max-w-2xl text-sm text-neutral-600 dark:text-neutral-400">
-	Quote a job by the day, or as a lump sum. Rates are shown per day — the unit you actually quote
-	in — and always in euros, whatever currency the fee was agreed in. A day is
-	<strong>{data.hoursPerDay}h</strong>, which you can change in
-	<a class="underline" href="/settings">settings</a>.
+	A job is either <strong>fixed price</strong> — the fee is a cap, and every extra day lowers what
+	it earned — or <strong>billed by the day</strong>, where an extra day is extra money. Rates are
+	shown per day and always in euros, whatever the fee was agreed in. A day is
+	<strong>{data.hoursPerDay}h</strong>{#if data.standardDayRate}, and your usual rate is
+		<strong>{data.standardDayRate} €/day</strong>{/if} —
+	both in <a class="underline" href="/settings">settings</a>.
 </p>
 
 {#if form?.message}
@@ -58,7 +60,17 @@
 				</td>
 
 				<td class="py-2">
-					{#if project.feeFormatted}
+					{#if project.billing === 'day_rate'}
+						{project.dayRateEur !== null ? project.dayRateEur + ' €/day' : '—'}
+						<span class="block text-xs text-neutral-400 dark:text-neutral-500">
+							billed by the day
+						</span>
+						{#if project.expectedRevenueEur !== null}
+							<span class="block text-xs text-neutral-500 dark:text-neutral-400">
+								≈ {project.expectedRevenueEur.toLocaleString('fr-FR')} EUR so far
+							</span>
+						{/if}
+					{:else if project.feeFormatted}
 						{project.feeFormatted}
 						{#if project.currency !== 'EUR'}
 							{#if project.feeEur !== null}
@@ -116,6 +128,11 @@
 								quoted {project.quotedDayRateEur} €/day
 							</span>
 						{/if}
+						{#if project.belowStandardRate && data.standardDayRate}
+							<span class="block text-xs text-red-700 dark:text-red-400">
+								under your usual {data.standardDayRate} €/day
+							</span>
+						{/if}
 					{:else}
 						—
 					{/if}
@@ -155,12 +172,27 @@
 								/>
 							</label>
 							<label class="block">
+								<span class="text-xs text-neutral-500 dark:text-neutral-400">Billing</span>
+								<select
+									name="billing"
+									class="mt-1 rounded border border-neutral-300 dark:border-neutral-700 px-2 py-1 text-sm"
+									title="Fixed: the fee is a cap and every extra day lowers what you earned. Day rate: you invoice the days you work."
+								>
+									<option value="fixed" selected={project.billing === 'fixed'}>
+										fixed price
+									</option>
+									<option value="day_rate" selected={project.billing === 'day_rate'}>
+										by the day
+									</option>
+								</select>
+							</label>
+							<label class="block">
 								<span class="text-xs text-neutral-500 dark:text-neutral-400">Day rate</span>
 								<input
 									name="dayRate"
 									type="number"
 									step="0.01"
-									value={project.quotedDayRateEur ?? ''}
+									value={project.dayRateEur ?? project.quotedDayRateEur ?? ''}
 									placeholder="e.g. 450"
 									class="mt-1 w-24 rounded border border-neutral-300 dark:border-neutral-700 px-2 py-1 text-sm"
 									title="Day rate × days sold becomes the fee. Leave blank to enter a lump sum instead."

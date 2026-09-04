@@ -118,6 +118,19 @@
 			/>
 		</label>
 		<label class="block text-sm">
+			<span class="text-xs text-neutral-500 dark:text-neutral-400">Your usual day rate (€)</span>
+			<input
+				name="defaultDayRateEur"
+				type="number"
+				min="0"
+				step="10"
+				value={data.settings.defaultDayRateEur ?? ''}
+				placeholder="optional"
+				class="mt-1 w-28 rounded border border-neutral-300 dark:border-neutral-700 px-2 py-1"
+				title="Only used for comparison: it is what tells you a fixed-price job is quietly earning less than you normally ask for."
+			/>
+		</label>
+		<label class="block text-sm">
 			<span class="text-xs text-neutral-500 dark:text-neutral-400">Planning horizon (days)</span>
 			<input
 				name="horizonDays"

@@ -59,6 +59,12 @@ export const settings = pgTable('settings', {
 	 * actually quotes. Two definitions of a day would drift apart.
 	 */
 	hoursPerDay: doublePrecision('hours_per_day').notNull().default(7),
+	/**
+	 * The rate you normally ask for, in euros. Used only for comparison: it is
+	 * what tells you a forfait is quietly earning 320/day against your usual
+	 * 450, which is the number that decides whether to take the next one.
+	 */
+	defaultDayRateEur: doublePrecision('default_day_rate_eur'),
 	defaultBufferPercent: integer('default_buffer_percent').notNull().default(0),
 	calibrationEnabled: boolean('calibration_enabled').notNull().default(true),
 	horizonDays: integer('horizon_days').notNull().default(21),
@@ -89,6 +95,20 @@ export const projects = pgTable('projects', {
 	agreedHours: doublePrecision('agreed_hours'),
 	/** Days sold, when the job was quoted as a day rate rather than a lump sum. */
 	agreedDays: doublePrecision('agreed_days'),
+	/**
+	 * How the job is billed. These are different economics, not two ways of
+	 * writing the same thing:
+	 *
+	 *   'fixed'    — a forfait. The fee is a cap; every extra day you spend
+	 *                lowers what the work earned per day.
+	 *   'day_rate' — régie. You invoice the days you work, so an extra day is
+	 *                extra money rather than a loss.
+	 */
+	billing: text('billing', { enum: ['fixed', 'day_rate'] })
+		.notNull()
+		.default('fixed'),
+	/** The agreed rate per day, in the project's currency. Day-rate jobs only. */
+	dayRate: doublePrecision('day_rate'),
 	/** Used with actual hours worked to show an effective hourly rate. */
 	agreedFee: doublePrecision('agreed_fee'),
 	/**

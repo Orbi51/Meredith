@@ -95,3 +95,33 @@ describe('a day is one number, used everywhere', () => {
 		expect(fee / 5).toBe(450);
 	});
 });
+
+describe('fixed price and day rate are different economics', () => {
+	// The distinction the projects page exists to make visible.
+	const perDay = 8;
+
+	it('a fixed fee earns LESS per day the longer it takes', () => {
+		const fee = 4000;
+		expect(Math.round(fee / 5)).toBe(800); // sold as 5 days
+		expect(Math.round(fee / 8)).toBe(500); // actually took 8
+		// The overrun is invisible in the total, which never changes — only the
+		// day rate reveals it.
+	});
+
+	it('a day rate earns the SAME per day, and more in total', () => {
+		const dayRate = 500;
+		expect(dayRate).toBe(500); // whatever the days
+		expect(dayRate * 5).toBe(2500);
+		expect(dayRate * 8).toBe(4000); // extra days are extra money, not a loss
+	});
+
+	it('compares a fixed job against the rate you normally ask', () => {
+		const fee = 4000;
+		const actualHours = 64; // eight 8-hour days
+		const hourly = fee / actualHours;
+		const projectedDayRate = Math.round(hourly * perDay);
+
+		expect(projectedDayRate).toBe(500);
+		expect(projectedDayRate < 600).toBe(true); // under a usual 600 — flag it
+	});
+});

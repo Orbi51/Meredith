@@ -265,6 +265,22 @@ Rates are shown per day first, hourly underneath: a day rate is what gets
 quoted and compared against the next offer, and it is the unit an invoice is
 written in. Hours remain the unit the scheduler thinks in.
 
+### Fixed price and day rate are not two ways of writing the same thing
+
+A project is billed one of two ways, and the arithmetic differs:
+
+- **fixed** — the fee is a cap. Every extra day lowers what the job earned per
+  day, and the total never moves, so the overrun is invisible unless you look
+  at the day rate. This is the case worth watching.
+- **day_rate** — you invoice the days you work. The rate is constant by
+  definition; an extra day is extra money. What matters here is expected
+  revenue (rate × days worked and planned), not "what did this work out at".
+
+`settings.defaultDayRateEur` is the rate you normally ask for. It is used for
+nothing except comparison — it is what turns "this forfait is earning 500/day"
+into "…against your usual 600", which is the number that decides whether to
+take the next one.
+
 ### Notifications are mostly about not sending things
 
 Two messages exist: a morning brief when something is planned, and an alert
