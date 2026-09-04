@@ -86,6 +86,37 @@ any one produces a different, unhelpful error:
 Refresh tokens also expire after ~6 months of disuse. The daily job prevents
 that simply by running.
 
+### Publishing an External consent screen needs public URLs
+
+Google asks for a homepage and a privacy policy before it will publish, and an
+*authorised domain* — which is a **domain**, not a URL. `github.com`, not
+`github.com/user/repo`. The repository serves all three:
+
+```
+authorised domain : github.com
+homepage          : https://github.com/Orbi51/Meredith
+privacy policy    : https://github.com/Orbi51/Meredith/blob/main/PRIVACY.md
+terms of service  : https://github.com/Orbi51/Meredith/blob/main/TERMS.md
+```
+
+You do not need to own the authorised domain — ownership is only checked during
+*verification*, which an app with one user does not need.
+
+The repository must be **public**, or those links 404 for everyone including
+Google. GitHub returns 404 rather than 403 for a private repository, so it
+looks like a typo rather than a permissions problem.
+
+### A refresh token belongs to the OAuth client that issued it
+
+Changing the client — a new Cloud project, new credentials — kills every stored
+token with `unauthorized_client`. Publishing the consent screen does not rescue
+a token issued while in Testing either; that one still carries the seven-day
+expiry.
+
+**Both are fixed the same way: sign out, sign in again.** Nothing else is
+needed, and nothing is lost. Verified twice by fingerprinting the stored token
+before and after.
+
 ### Google stores event times to the second
 
 Milliseconds are dropped on the round trip. A test that builds a time from
@@ -227,6 +258,12 @@ Google Tasks rather than deleted, so a misparse is still recoverable from the
 
 Dates resolve against **when the task was typed**, not when it was drained.
 "demain", captured on Monday and picked up on Wednesday, still means Tuesday.
+
+The list is called **`Meredith inbox`** and the app creates it itself. It reads
+and writes **that list only** — the same rule as the calendar. The first
+version drained every list, which against the real account would have swallowed
+30 personal items from `My Tasks` and `Work` into the plan and marked them
+completed. Not a mistake anyone could undo by hand.
 
 ### Setup
 
