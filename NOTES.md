@@ -49,6 +49,33 @@ anyone's terminal.
 `npm run dev` is for editing code, and it wants the same port, so stop the
 running app first with `scripts/Stop-Meredith.cmd`.
 
+### ORIGIN is required, or every form POST is refused
+
+adapter-node cannot know the address it is served on. Without `ORIGIN`,
+SvelteKit's CSRF check compares the browser's `Origin` header against a
+guess, they disagree, and every POST comes back:
+
+```
+Cross-site POST form submissions are forbidden
+```
+
+Which reads like a security problem with the app and is in fact a missing
+environment variable. It breaks **everything** that submits — deleting a task,
+saving an edit, confirming a block, replanning — while the pages themselves
+load perfectly, so it looks like one broken button rather than a broken build.
+
+`ORIGIN=http://localhost:5173`. It must match the address actually used. The
+dev server never has the problem, so this only appears once the app is run for
+real.
+
+Check both directions after changing it — a same-origin POST must pass and a
+foreign one must still be refused:
+
+```bash
+curl -s -X POST "http://localhost:5173/tasks?/replan"   -H "Origin: http://localhost:5173" | grep -c "forbidden"   # 0
+curl -s -X POST "http://localhost:5173/tasks?/replan"   -H "Origin: http://evil.example" | grep -c "forbidden"     # 1
+```
+
 ### AUTH_URL is required when the production build runs over http
 
 Auth.js issues `__Secure-` prefixed cookies when it believes it is in
