@@ -33,8 +33,39 @@ And check the server is actually up before blaming your code:
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:5173/
 ```
 
-`000` means nothing is listening. The dev server died twice during development
-for no visible reason; restarting it is the whole fix.
+`000` means nothing is listening.
+
+### Do not run the app on a dev server you did not start yourself
+
+The dev server kept dying during development, seemingly at random. It was not
+random: it had been started by an assistant's tooling, and its lifetime was
+tied to that session. Nothing was wrong with the app.
+
+The app now runs as its own detached process — `scripts/Meredith.cmd`, or the
+`.vbs` from the Startup folder — serving the **production build** on port 5173.
+That build starts in a second, has no file watcher, and is not attached to
+anyone's terminal.
+
+`npm run dev` is for editing code, and it wants the same port, so stop the
+running app first with `scripts/Stop-Meredith.cmd`.
+
+### AUTH_URL is required when the production build runs over http
+
+Auth.js issues `__Secure-` prefixed cookies when it believes it is in
+production. The browser refuses to send those over `http://`, so the app looks
+permanently signed out — no error, just a sign-in link that never sticks.
+
+Setting `AUTH_URL=http://localhost:5173` tells it the truth and it uses
+ordinary cookies. This only bites the production build; the dev server never
+had the problem.
+
+### Native <select> needs an explicit background
+
+Tailwind's reset makes form controls transparent. On Windows the dropdown popup
+paints with the element's own background, so transparent gives a white popup
+while the text inherits the page's light colour — grey on white, unreadable in
+dark mode. Set once in `app.css` for every `select` and `option`, so a new one
+cannot be added wrong.
 
 ### `.env` versus `.env.example`
 

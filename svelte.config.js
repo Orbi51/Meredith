@@ -1,14 +1,18 @@
-import adapter from '@sveltejs/adapter-netlify';
+import adapterNode from '@sveltejs/adapter-node';
+import adapterNetlify from '@sveltejs/adapter-netlify';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+/*
+ * The real deployment is a long-running process on the user's own machine, so
+ * adapter-node is the default. The Netlify build stays available behind
+ * ADAPTER=netlify in case hosting is ever wanted again.
+ */
+const useNetlify = process.env.ADAPTER === 'netlify';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	preprocess: vitePreprocess(),
-	kit: {
-		// Netlify Functions (Node), not edge: the app uses a TCP Postgres driver
-		// and googleapis, neither of which runs on the edge runtime.
-		adapter: adapter()
-	}
+	kit: { adapter: useNetlify ? adapterNetlify() : adapterNode() }
 };
 
 export default config;

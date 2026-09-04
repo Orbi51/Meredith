@@ -19,3 +19,27 @@
 html.dark {
 	color-scheme: dark;
 }
+
+@layer base {
+	/*
+	 * Native <select> needs an explicit background.
+	 *
+	 * Tailwind's reset makes form controls transparent, and on Windows the
+	 * dropdown popup paints with the element's own background — so transparent
+	 * means a white popup, while the text inherits the page's light colour.
+	 * Light-grey-on-white: illegible.
+	 *
+	 * Set here rather than on each of the nine selects, so a tenth cannot be
+	 * added wrong.
+	 */
+	select {
+		background-color: #ffffff;
+		color: #171717;
+	}
+
+	html.dark select,
+	html.dark option {
+		background-color: #171717;
+		color: #f5f5f5;
+	}
+}

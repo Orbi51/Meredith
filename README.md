@@ -25,7 +25,35 @@ Phase 2 gives you: quick capture with LLM parsing (`Ctrl+K`), task and project
 CRUD, working-hours settings, the today and week views, one-tap block
 confirmation, and automatic replanning to the calendar on every change.
 
-## Running it
+## Running it as an app you actually use
+
+The real deployment is a long-running process on your own machine. Start it
+once and it stays up:
+
+```
+scripts\Meredith.cmd
+```
+
+To have it there every time you log in, put a shortcut to
+`scripts\Meredith-hidden.vbs` in your Startup folder — press `Win+R`, type
+`shell:startup`, and drop the shortcut in. It runs with no console window, and
+the app is simply always at **http://localhost:5173**.
+
+`scripts\Stop-Meredith.cmd` stops it, which you need before `npm run dev`
+since both want port 5173.
+
+This runs the **production build**, not the dev server: it starts in about a
+second, has no file watcher, and does not fall over when something touches a
+file. `ENABLE_DAILY_JOB=true` means the morning replan and brief happen in this
+process at 07:00 — no cloud, no cron service.
+
+After changing code, rebuild:
+
+```
+npm run build
+```
+
+## Running it for development
 
 ```bash
 npm install
