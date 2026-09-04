@@ -79,4 +79,8 @@ These terms are governed by French law.
 
 ## Contact
 
-quentin.pointillart@gmail.com
+Open an issue at
+[github.com/Orbi51/Meredith/issues](https://github.com/Orbi51/Meredith/issues).
+
+The Google consent screen also carries a support email address, which reaches
+the same person.
