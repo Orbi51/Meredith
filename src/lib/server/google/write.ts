@@ -240,3 +240,51 @@ export function eventDescription(options: {
 function round(hours: number): number {
 	return Math.round(hours * 100) / 100;
 }
+
+/**
+ * Delete anything on our own calendar that no block accounts for.
+ *
+ * Orphans appear whenever a block disappears without the sync being told: a
+ * task deleted (its blocks cascade, taking their event ids with them), a row
+ * removed by hand, a crash between writing Google and writing the database.
+ * Tracking every path is hopeless; comparing the two is not.
+ *
+ * This is safe ONLY because the app owns this calendar outright — it created
+ * it, it is the only writer, and nothing else should ever live there. The
+ * guard still applies: this refuses to run against any other calendar.
+ */
+export async function reconcileOwnCalendar(
+	auth: OAuth2Client,
+	calendarId: string,
+	ownCalendarId: string | null,
+	liveEventIds: Set<string>,
+	window: { from: Date; to: Date }
+): Promise<{ removed: number; summaries: string[] }> {
+	assertOwnCalendar(calendarId, ownCalendarId);
+	const api = calendarApi(auth);
+
+	const response = await api.events.list({
+		calendarId,
+		timeMin: window.from.toISOString(),
+		timeMax: window.to.toISOString(),
+		singleEvents: true,
+		maxResults: 2500
+	});
+
+	const orphans = (response.data.items ?? []).filter(
+		(event) => event.id && event.status !== 'cancelled' && !liveEventIds.has(event.id)
+	);
+
+	for (const orphan of orphans) {
+		try {
+			await api.events.delete({ calendarId, eventId: orphan.id as string });
+		} catch (error) {
+			if (!isMissing(error)) throw error;
+		}
+	}
+
+	return {
+		removed: orphans.length,
+		summaries: orphans.map((event) => event.summary ?? '(untitled)')
+	};
+}

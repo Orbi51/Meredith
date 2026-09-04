@@ -192,6 +192,23 @@ asserts the guard refuses.
 
 Run it after any change to `src/lib/server/google/`.
 
+### Orphaned events, and why reconciliation is the only reliable answer
+
+Deleting a task cascades its blocks away in the database — taking their
+`googleEventId` with them — so nothing is left to tell Google. The events stay
+on the calendar forever. Four of them once stacked on a single Monday morning,
+invisible to the app and obvious to anyone looking at their calendar.
+
+The same happens after a row removed by hand, or a crash between writing Google
+and writing the database. Tracking every path that can lose a block is
+hopeless; comparing the two sides is not.
+
+Each replan now lists the events on the app's own calendar and deletes any that
+no live block accounts for. This is safe **only** because the app owns that
+calendar outright — it created it and is its only writer. Do not put anything
+there by hand; it will be swept away. The guard refuses to run this against any
+other calendar, which is the property the tests pin.
+
 ---
 
 ## 3. Decisions that look like bugs

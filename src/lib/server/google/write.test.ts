@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eventDescription, eventSummary, planSync } from './write';
+import { ForbiddenCalendarError, eventDescription, eventSummary, planSync, reconcileOwnCalendar } from './write';
 import type { DesiredEvent } from './write';
 
 function event(over: Partial<DesiredEvent> & { blockId: string }): DesiredEvent {
@@ -64,5 +64,33 @@ describe('event text', () => {
 		});
 
 		expect(description).toContain('inferred from past work');
+	});
+});
+
+describe('reconcileOwnCalendar', () => {
+	// The guard matters more here than anywhere else: this function deletes
+	// events, and its whole premise is "anything not accounted for is garbage".
+	// Pointed at a calendar we do not own, that premise is catastrophic.
+	it('refuses any calendar but our own', async () => {
+		await expect(
+			reconcileOwnCalendar(
+				{} as never,
+				'primary',
+				'our-calendar-id',
+				new Set(),
+				{ from: new Date(), to: new Date() }
+			)
+		).rejects.toThrow(ForbiddenCalendarError);
+	});
+
+	it('refuses when we do not know which calendar is ours', async () => {
+		// A different message, but still a refusal: an unset own-calendar means
+		// "not configured", never "anything goes".
+		await expect(
+			reconcileOwnCalendar({} as never, 'anything', null, new Set(), {
+				from: new Date(),
+				to: new Date()
+			})
+		).rejects.toThrow(/No target calendar configured/);
 	});
 });

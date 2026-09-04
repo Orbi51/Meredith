@@ -40,7 +40,8 @@ import {
 	ensureTargetCalendar,
 	eventDescription,
 	eventSummary,
-	planSync
+	planSync,
+	reconcileOwnCalendar
 } from './google/write';
 import type { DesiredEvent } from './google/write';
 
@@ -338,10 +339,23 @@ async function pushToCalendar(
 			.where(eq(schema.blocks.id, blockId));
 	}
 
+	// Sweep up anything the calendar still holds that no block accounts for.
+	// Deleting a task cascades its blocks away, taking their event ids with
+	// them, so the events would otherwise pile up invisibly — four of them
+	// stacked on one Monday morning before this existed.
+	const live = new Set<string>([
+		...previouslyWritten,
+		...applied.map((entry) => entry.googleEventId)
+	]);
+	const swept = await reconcileOwnCalendar(auth, targetCalendarId, targetCalendarId, live, {
+		from: input.now,
+		to: new Date(input.now.getTime() + input.horizonDays * 24 * 3_600_000)
+	});
+
 	return {
 		inserted: plan.insert.length,
 		updated: plan.update.length,
-		removed: plan.remove.length
+		removed: plan.remove.length + swept.removed
 	};
 }
 
