@@ -8,7 +8,13 @@
 
 import { fail, redirect } from '@sveltejs/kit';
 import { requireUser } from '$lib/server/auth';
-import { createProject, createTask, getSettings, listProjects } from '$lib/server/db/queries';
+import {
+	createProject,
+	createTask,
+	getSettings,
+	latestWorkingHour,
+	listProjects
+} from '$lib/server/db/queries';
 import { parseQuickAdd } from '$lib/server/parse';
 import { replan } from '$lib/server/planner';
 import { DEFAULT_MIN_BLOCK_MINUTES } from '$lib/scheduler/types';
@@ -18,7 +24,11 @@ import type { Actions, PageServerLoad } from './$types';
 export const load: PageServerLoad = async (event) => {
 	const user = await requireUser(event);
 	const text = event.url.searchParams.get('text') ?? '';
-	const [projects, settings] = await Promise.all([listProjects(user.id), getSettings(user.id)]);
+	const [projects, settings, endOfDay] = await Promise.all([
+		listProjects(user.id),
+		getSettings(user.id),
+		latestWorkingHour(user.id)
+	]);
 
 	const parsed = text.trim()
 		? await parseQuickAdd(text, {
@@ -28,7 +38,10 @@ export const load: PageServerLoad = async (event) => {
 					clientName: p.clientName
 				})),
 				timezone: settings?.timezone ?? 'Europe/Paris',
-				now: new Date()
+				now: new Date(),
+				hoursPerDay: settings?.hoursPerDay,
+				// A bare date means the end of YOUR working day, not 18:00.
+				endOfDay: endOfDay ?? undefined
 			})
 		: null;
 

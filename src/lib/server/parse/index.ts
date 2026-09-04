@@ -39,7 +39,14 @@ export type ProjectChoice = { id: string; name: string; clientName: string | nul
 
 export async function parseQuickAdd(
 	text: string,
-	options: { projects: ProjectChoice[]; timezone: string; now: Date; hoursPerDay?: number }
+	options: {
+		projects: ProjectChoice[];
+		timezone: string;
+		now: Date;
+		hoursPerDay?: number;
+		/** When the user's working day ends, "HH:MM". A bare date is due then. */
+		endOfDay?: string;
+	}
 ): Promise<ParsedTask> {
 	const trimmed = text.trim();
 	if (!trimmed) {
@@ -70,7 +77,7 @@ export async function parseQuickAdd(
 
 	// ------------------------------------------------------------------ step 1
 	const estimate = extractEstimate(trimmed, options.hoursPerDay);
-	const deadline = extractDeadline(trimmed, options.now, options.timezone);
+	const deadline = extractDeadline(trimmed, options.now, options.timezone, options.endOfDay);
 	const kind = detectKind(trimmed);
 
 	// A project named in the text is found by matching, not by asking a model —

@@ -5,6 +5,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { formatInTimeZone } from 'date-fns-tz';
+import { minutesBetween } from './intervals';
 import { schedule } from './index';
 import { hoursOfBlocks, input, interval, paris, standardWorkingHours, task } from './fixtures';
 import { hoursBetween } from './intervals';
@@ -85,9 +87,12 @@ describe('placement', () => {
 		expect(output.unplaced[0]).toMatchObject({ taskId: 'deep', hoursShort: 4 });
 	});
 
-	it('allows a final remainder shorter than minBlockMinutes', () => {
-		// 2.5h of creative work with a 2h minimum, and a morning only 2h long:
-		// 2h + a 30min tail is better than never finishing the task.
+	it('takes less now rather than stranding a remainder too small to use', () => {
+		// 2.5h of creative work with a 2h minimum, and a morning only 2h long.
+		//
+		// This used to place 2h and then a 30-minute crumb. Half an hour of
+		// modelling achieves nothing, so the scheduler now prefers a slot that
+		// can hold the work properly — or splits so that BOTH halves are usable.
 		const workingHours = [
 			{
 				dayOfWeek: 1,
@@ -107,7 +112,11 @@ describe('placement', () => {
 		);
 
 		expect(output.unplaced).toEqual([]);
-		expect(output.blocks.map((b) => hoursBetween(b.start, b.end))).toEqual([2, 0.5]);
+		// One 2.5h block in the afternoon, not 2h plus a crumb in the morning.
+		expect(output.blocks.map((b) => hoursBetween(b.start, b.end))).toEqual([2.5]);
+		for (const block of output.blocks) {
+			expect(hoursBetween(block.start, block.end)).toBeGreaterThanOrEqual(2);
+		}
 	});
 });
 
@@ -319,6 +328,93 @@ describe('ordering', () => {
 			...output.blocks.filter((b) => b.taskId === 'urgent').map((b) => b.end.getTime())
 		);
 		expect(urgentEnd).toBeLessThanOrEqual(paris('2026-09-11T18:00').getTime());
+	});
+
+	it('fills the afternoon before moving to the next morning', () => {
+		// The real pattern: mornings reserved for creative work, afternoons open.
+		// Preference used to be applied across the whole horizon, so a creative
+		// task took every morning for three weeks and never touched an
+		// afternoon — a plan nobody would choose.
+		const workingHours = [1, 2, 3, 4, 5].map((dayOfWeek) => ({
+			dayOfWeek,
+			intervals: [
+				{ start: '09:00', end: '12:30', preferredKind: 'creative' as const },
+				{ start: '14:00', end: '19:00', preferredKind: null }
+			]
+		}));
+
+		const output = schedule(
+			input({
+				workingHours,
+				tasks: [task({ id: 'big', estimateHours: 16, kind: 'creative' })]
+			})
+		);
+
+		const days = new Set(
+			output.blocks.map((b) => formatInTimeZone(b.start, 'Europe/Paris', 'yyyy-MM-dd'))
+		);
+		// 16h of work against 8.5h a day: two days, not five mornings.
+		expect(days.size).toBeLessThanOrEqual(3);
+
+		const usesAfternoon = output.blocks.some(
+			(b) => Number(formatInTimeZone(b.start, 'Europe/Paris', 'H')) >= 14
+		);
+		expect(usesAfternoon).toBe(true);
+	});
+
+	it('still prefers the morning within a day', () => {
+		// The preference is not abandoned — it simply competes inside one day
+		// rather than across the horizon.
+		const output = schedule(
+			input({
+				workingHours: [
+					{
+						dayOfWeek: 1,
+						intervals: [
+							{ start: '09:00', end: '12:30', preferredKind: 'creative' as const },
+							{ start: '14:00', end: '19:00', preferredKind: null }
+						]
+					}
+				],
+				tasks: [task({ id: 'small', estimateHours: 2, kind: 'creative' })]
+			})
+		);
+
+		const first = output.blocks[0]!;
+		expect(Number(formatInTimeZone(first.start, 'Europe/Paris', 'H'))).toBeLessThan(12);
+	});
+
+	it('never strands a crumb of creative work', () => {
+		// A 4h task meeting a 3h30 morning used to place 3h30 and then a
+		// 30-minute fragment. Half an hour of modelling achieves nothing — §5
+		// exists precisely to prevent a calendar that looks full and is not.
+		const output = schedule(
+			input({
+				workingHours: [
+					{
+						dayOfWeek: 1,
+						intervals: [
+							{ start: '09:00', end: '12:30', preferredKind: 'creative' as const },
+							{ start: '14:00', end: '19:00', preferredKind: null }
+						]
+					}
+				],
+				tasks: [task({ id: 'four-hours', estimateHours: 4, kind: 'creative' })]
+			})
+		);
+
+		for (const block of output.blocks) {
+			expect(minutesBetween(block.start, block.end)).toBeGreaterThanOrEqual(120);
+		}
+	});
+
+	it('still schedules a task smaller than its own minimum block', () => {
+		// The rule must not make a one-hour creative task unschedulable.
+		const output = schedule(
+			input({ tasks: [task({ id: 'short', estimateHours: 1, kind: 'creative' })] })
+		);
+		expect(output.blocks).toHaveLength(1);
+		expect(minutesBetween(output.blocks[0]!.start, output.blocks[0]!.end)).toBe(60);
 	});
 
 	it('respects earliestStart', () => {

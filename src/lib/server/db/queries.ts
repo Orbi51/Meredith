@@ -364,3 +364,21 @@ export async function getAllFutureBlocks(userId: string, now: Date): Promise<Blo
 		)
 		.orderBy(asc(schema.blocks.start));
 }
+
+/**
+ * The latest hour the user actually works, "HH:MM".
+ *
+ * A capture that names only a date is due at the end of that day — theirs, not
+ * a number chosen by the app. Returns null when no working hours are set, so
+ * the caller can fall back rather than invent one.
+ */
+export async function latestWorkingHour(userId: string): Promise<string | null> {
+	const hours = await getWorkingHours(userId);
+	let latest: string | null = null;
+	for (const day of hours) {
+		for (const interval of day.intervals) {
+			if (latest === null || interval.end > latest) latest = interval.end;
+		}
+	}
+	return latest;
+}

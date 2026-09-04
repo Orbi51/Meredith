@@ -59,8 +59,13 @@ function wholeSegmentEstimate(segment: string, hoursPerDay?: number): number | n
 }
 
 /** Is this segment nothing but a date? */
-function wholeSegmentDeadline(segment: string, now: Date, timezone: string): Date | null {
-	const found = extractDeadline(segment, now, timezone);
+function wholeSegmentDeadline(
+	segment: string,
+	now: Date,
+	timezone: string,
+	endOfDay?: string
+): Date | null {
+	const found = extractDeadline(segment, now, timezone, endOfDay);
 	if (!found) return null;
 	return found.matched.trim().length === segment.length ? found.value : null;
 }
@@ -80,7 +85,13 @@ function matchKnownProject(segment: string, projects: ProjectLike[]): ProjectLik
 
 export function parseStructured(
 	text: string,
-	options: { projects: ProjectLike[]; timezone: string; now: Date; hoursPerDay?: number }
+	options: {
+		projects: ProjectLike[];
+		timezone: string;
+		now: Date;
+		hoursPerDay?: number;
+		endOfDay?: string;
+	}
 ): StructuredCapture {
 	const segments = splitSegments(text);
 
@@ -99,7 +110,12 @@ export function parseStructured(
 			return;
 		}
 
-		const asDeadline = wholeSegmentDeadline(segment, options.now, options.timezone);
+		const asDeadline = wholeSegmentDeadline(
+			segment,
+			options.now,
+			options.timezone,
+			options.endOfDay
+		);
 		if (asDeadline !== null && deadline === null) {
 			deadline = asDeadline;
 			return;

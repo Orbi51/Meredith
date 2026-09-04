@@ -103,6 +103,22 @@ describe('extractDeadline', () => {
 		expect(civilOf(extractDeadline('x dans 3 jours', NOW, TZ)!.value)).toBe('2026-09-06 18:00');
 	});
 
+	it('is due at the end of YOUR working day, not a hardcoded 18:00', () => {
+		// Someone whose day ends at 19:00 was told the task was due an hour
+		// earlier than it was, which quietly shortened the time available to
+		// do it.
+		expect(civilOf(extractDeadline('storyboard friday', NOW, TZ, '19:00')!.value)).toBe(
+			'2026-09-04 19:00'
+		);
+		expect(civilOf(extractDeadline('storyboard friday', NOW, TZ, '17:30')!.value)).toBe(
+			'2026-09-04 17:30'
+		);
+		// Falls back only when no working hours are configured.
+		expect(civilOf(extractDeadline('storyboard friday', NOW, TZ)!.value)).toBe(
+			'2026-09-04 18:00'
+		);
+	});
+
 	it('invents nothing when no date is mentioned', () => {
 		// A task with no deadline is a perfectly good task. Guessing one would
 		// make the overcommitment report lie.

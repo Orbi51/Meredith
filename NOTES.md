@@ -210,6 +210,35 @@ nothing. Its deadline is blown either way, so it yields to work that can
 actually be done. It is still scheduled, still reported unplaced, still flagged
 past its deadline.
 
+### A kind preference competes within a day, not across the horizon
+
+Mornings marked "creative" used to be filled for the whole horizon before an
+afternoon was touched: a creative task took every morning for three weeks and
+never used an afternoon at all. Working one job in two-hour bites across
+fifteen days is not a preference being honoured.
+
+Slots are now chosen by earliest DAY first, and only within that day by
+preference. Mornings still win — against the same day's afternoon, not against
+next week.
+
+### A split never strands a crumb
+
+A 4h task meeting a 3h30 morning used to place 3h30 and then a 30-minute
+fragment. Half an hour of modelling achieves nothing, which is the whole reason
+§5 has minimum block sizes.
+
+The scheduler now takes LESS from the first slot so that what remains is still
+a usable block: 4h becomes 2h + 2h, not 3h30 + 30min. A task smaller than its
+own minimum block is still placed whole — a one-hour creative task must not
+become unschedulable because two hours is preferred.
+
+### A bare date is due at the end of YOUR working day
+
+`extractDeadline` took a hardcoded 18:00, so someone whose day ends at 19:00
+was told a task was due an hour before it was — and the scheduler then had an
+hour less to fit it in. It now takes the latest end from the configured working
+hours, falling back to 18:00 only when none are set.
+
 ### Slack is measured over the whole horizon, not the current week
 
 A task due next Thursday can draw on next week's capacity. Measuring only this

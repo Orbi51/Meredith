@@ -25,6 +25,7 @@ import {
 	dropShorterThan,
 	expandWorkingHours,
 	hoursBetween,
+	civilDateIn,
 	isoWeekOf,
 	machinePool,
 	minutesBetween,
@@ -200,7 +201,8 @@ export function schedule(input: SchedulerInput): SchedulerOutput {
 			earliestAllowed,
 			horizonEnd,
 			poolName,
-					round === 'before-deadline' ? (task.deadline?.getTime() ?? Infinity) : Infinity
+					round === 'before-deadline' ? (task.deadline?.getTime() ?? Infinity) : Infinity,
+			timezone
 		);
 
 		blocks.push(...placement.blocks);
@@ -354,65 +356,78 @@ function placeTask(
 	horizonEnd: Date,
 	pool: 'human' | 'machine',
 	/** Hard ceiling for this round — the task's deadline, or Infinity. */
-	roundLimit: number
+	roundLimit: number,
+	timezone: string
 ): Placement {
 	const { task } = entry;
 	let remaining = entry.remainingMinutes;
 	const blocks: PlannedBlock[] = [];
 	let working = capacity;
 
-	// Within a round, passes run in descending order of how happy the user
-	// would be: slots reserved for this kind of work, then slots reserved for
-	// nothing, then anything at all. The last pass exists only so that a soft
-	// preference never leaves real work unscheduled — a deadline beats working
-	// at the preferred time of day, every time.
-	const kindPreferences: ((interval: FreeInterval) => boolean)[] = [
-		(interval) => interval.preferredKind === task.kind,
-		(interval) => interval.preferredKind === null,
-		() => true
-	];
-	const passes = kindPreferences.map((matches) => ({ limit: roundLimit, matches }));
+	/**
+	 * How much this task would rather have a given slot: 0 for one reserved
+	 * for its own kind, 1 for one reserved for nothing, 2 for one reserved for
+	 * something else. A soft preference — never a reason to leave work
+	 * unscheduled.
+	 */
+	const preference = (interval: FreeInterval) =>
+		interval.preferredKind === task.kind ? 0 : interval.preferredKind === null ? 1 : 2;
 
-	for (const { limit, matches } of passes) {
-		if (remaining <= 0) break;
+	while (remaining > 0) {
+		// Choose the best slot: EARLIEST DAY first, and only within that day by
+		// preference.
+		//
+		// Preference used to be applied across the whole horizon, so a creative
+		// task filled every reserved morning for three weeks before it would
+		// touch a single afternoon. Working one job in two-hour bites across
+		// fifteen days is not a preference being honoured, it is a plan nobody
+		// would choose. Mornings still win — but only against the same day's
+		// afternoon, not against next week.
+		let bestIndex = -1;
+		let bestDay = '';
+		let bestRank = 0;
+		let bestStart = 0;
 
-		// The list is walked fresh each pass: earlier passes have already
-		// consumed the slots they could use.
-		let index = 0;
-		while (index < working.length && remaining > 0) {
+		for (let index = 0; index < working.length; index++) {
 			const interval = working[index]!;
-			if (!matches(interval)) {
-				index++;
-				continue;
-			}
-
 			const start = Math.max(interval.start.getTime(), earliestAllowed.getTime());
-			// `limit` keeps a block from straddling the deadline on the passes
-			// that are still trying to finish the task on time.
-			const end = Math.min(interval.end.getTime(), horizonEnd.getTime(), limit);
-			const usableMinutes = (end - start) / MS_PER_MINUTE;
+			// `roundLimit` keeps a block from straddling the deadline while this
+			// round is still trying to finish the task on time.
+			const end = Math.min(interval.end.getTime(), horizonEnd.getTime(), roundLimit);
+			if (end <= start) continue;
+			if (chunkFor(task, remaining, (end - start) / MS_PER_MINUTE) === null) continue;
 
-			if (usableMinutes <= 0) {
-				index++;
-				continue;
+			const day = civilDateIn(new Date(start), timezone);
+			const rank = preference(interval);
+
+			const better =
+				bestIndex === -1 ||
+				day < bestDay ||
+				(day === bestDay && (rank < bestRank || (rank === bestRank && start < bestStart)));
+
+			if (better) {
+				bestIndex = index;
+				bestDay = day;
+				bestRank = rank;
+				bestStart = start;
 			}
-
-			const chunkMinutes = chunkFor(task, remaining, usableMinutes);
-			if (chunkMinutes === null) {
-				index++;
-				continue;
-			}
-
-			const blockStart = new Date(start);
-			const blockEnd = new Date(start + chunkMinutes * MS_PER_MINUTE);
-			blocks.push({ taskId: task.id, start: blockStart, end: blockEnd, pool });
-			remaining = roundMinutes(remaining - chunkMinutes);
-
-			// Replace the interval with whatever is left of it either side of the
-			// block. `index` deliberately does not advance past a leading
-			// remainder — another task may still be able to use that piece.
-			working = consume(working, index, blockStart, blockEnd);
 		}
+
+		if (bestIndex === -1) break;
+
+		const interval = working[bestIndex]!;
+		const start = Math.max(interval.start.getTime(), earliestAllowed.getTime());
+		const end = Math.min(interval.end.getTime(), horizonEnd.getTime(), roundLimit);
+		const chunkMinutes = chunkFor(task, remaining, (end - start) / MS_PER_MINUTE) as number;
+
+		const blockStart = new Date(start);
+		const blockEnd = new Date(start + chunkMinutes * MS_PER_MINUTE);
+		blocks.push({ taskId: task.id, start: blockStart, end: blockEnd, pool });
+		remaining = roundMinutes(remaining - chunkMinutes);
+
+		// Replace the interval with whatever is left either side of the block; a
+		// leading remainder stays available to other tasks.
+		working = consume(working, bestIndex, blockStart, blockEnd);
 	}
 
 	return { blocks, remainingCapacity: working, leftoverMinutes: Math.max(0, remaining) };
@@ -438,10 +453,23 @@ function chunkFor(
 	}
 
 	const chunk = Math.min(remainingMinutes, usableMinutes);
-	if (chunk >= task.minBlockMinutes) return chunk;
-	// Shorter than the minimum block — acceptable only as the task's tail.
+
+	// The whole of what is left fits here. Allowed even when it is shorter than
+	// the minimum block: a one-hour creative task must not become unschedulable
+	// because two hours is the preferred stretch.
 	if (chunk === remainingMinutes) return chunk;
-	return null;
+
+	// We are splitting. Never take an amount that strands a remainder too small
+	// to be worth booking: a 4h task meeting a 3h30 morning used to leave a
+	// 30-minute crumb, and half an hour of modelling achieves nothing. Take
+	// less now, so that what is left is still a usable block.
+	const leftover = remainingMinutes - chunk;
+	if (leftover < task.minBlockMinutes) {
+		const reduced = remainingMinutes - task.minBlockMinutes;
+		return reduced >= task.minBlockMinutes ? reduced : null;
+	}
+
+	return chunk >= task.minBlockMinutes ? chunk : null;
 }
 
 /** Remove [start, end) from the interval at `index`, keeping any remainders. */

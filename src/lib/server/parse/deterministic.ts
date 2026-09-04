@@ -23,8 +23,15 @@ export type Extraction<T> = {
 	matched: string;
 } | null;
 
-/** When only a day is given, work is due by the end of the working day. */
-const DEFAULT_DEADLINE_TIME = '18:00';
+/**
+ * When only a day is given, work is due by the end of the working day — the
+ * user's own, not a number invented here.
+ *
+ * The fallback applies only when no working hours are configured. Hardcoding
+ * 18:00 told someone whose day ends at 19:00 that their task was due an hour
+ * before it was, and silently shortened the time available to do it.
+ */
+export const FALLBACK_DEADLINE_TIME = '18:00';
 /**
  * A "day" of work, for estimates written as "2 days" or "2j".
  *
@@ -108,10 +115,15 @@ export function extractEstimate(
  * deadline is a perfectly good task, and inventing one would make the
  * overcommitment report lie.
  */
-export function extractDeadline(text: string, now: Date, timezone: string): Extraction<Date> {
+export function extractDeadline(
+	text: string,
+	now: Date,
+	timezone: string,
+	endOfDay: string = FALLBACK_DEADLINE_TIME
+): Extraction<Date> {
 	const todayCivil = formatInTimeZone(now, timezone, 'yyyy-MM-dd');
 	const at = (civil: string, matched: string): Extraction<Date> => ({
-		value: wallClockToInstant(civil, DEFAULT_DEADLINE_TIME, timezone),
+		value: wallClockToInstant(civil, endOfDay, timezone),
 		matched
 	});
 

@@ -7,7 +7,12 @@
 
 import { redirect } from '@sveltejs/kit';
 import { requireUser } from '$lib/server/auth';
-import { createTask, getSettings, listProjects } from '$lib/server/db/queries';
+import {
+	createTask,
+	getSettings,
+	latestWorkingHour,
+	listProjects
+} from '$lib/server/db/queries';
 import { parseQuickAdd } from '$lib/server/parse';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -30,11 +35,14 @@ export const actions: Actions = {
 		const headline = title || text || url || 'Shared item';
 		const settings = await getSettings(user.id);
 		const projects = await listProjects(user.id);
+		const endOfDay = await latestWorkingHour(user.id);
 
 		const parsed = await parseQuickAdd(headline, {
 			projects: projects.map((p) => ({ id: p.id, name: p.name, clientName: p.clientName })),
 			timezone: settings?.timezone ?? 'Europe/Paris',
-			now: new Date()
+			now: new Date(),
+			hoursPerDay: settings?.hoursPerDay,
+			endOfDay: endOfDay ?? undefined
 		});
 
 		const notes = [text && text !== headline ? text : null, url && url !== headline ? url : null]

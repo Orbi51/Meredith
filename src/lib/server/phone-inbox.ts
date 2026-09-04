@@ -11,7 +11,7 @@
  */
 
 import type { OAuth2Client } from 'google-auth-library';
-import { createTask, listProjects } from './db/queries';
+import { createTask, latestWorkingHour, listProjects } from './db/queries';
 import { parseQuickAdd } from './parse';
 import {
 	ensureInboxList,
@@ -70,6 +70,7 @@ export async function drainPhoneInbox(
 	if (captures.length === 0) return result;
 
 	const projects = await listProjects(userId);
+	const endOfDay = await latestWorkingHour(userId);
 	const choices = projects.map((p) => ({ id: p.id, name: p.name, clientName: p.clientName }));
 
 	for (const capture of captures) {
@@ -79,7 +80,8 @@ export async function drainPhoneInbox(
 				timezone,
 				// Resolve dates against when it was TYPED. "demain", captured on
 				// Monday and drained on Wednesday, still means Tuesday.
-				now: capture.capturedAt
+				now: capture.capturedAt,
+				endOfDay: endOfDay ?? undefined
 			});
 
 			await createTask(userId, {

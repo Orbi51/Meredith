@@ -26,6 +26,7 @@ import { db, schema } from './db';
 import type { CalendarAppointment } from './google/read';
 import { parseStructured } from './parse/structured';
 import { detectKind } from './parse/deterministic';
+import { latestWorkingHour } from './db/queries';
 import type { ProjectRow } from './db/queries';
 
 /**
@@ -91,6 +92,7 @@ export async function adoptCalendarWork(
 	const existingByEvent = new Map(existing.map((task) => [task.sourceEventId as string, task]));
 
 	const choices = projects.map((p) => ({ id: p.id, name: p.name, clientName: p.clientName }));
+	const endOfDay = await latestWorkingHour(userId);
 	const result: AdoptionResult = { adopted: 0, updated: 0, skippedIgnored: 0 };
 
 	for (const appointment of candidates) {
@@ -112,7 +114,12 @@ export async function adoptCalendarWork(
 
 		// The title follows the same dash convention the quick-add parser knows,
 		// so reuse it rather than inventing a second way to read the same thing.
-		const parsed = parseStructured(appointment.summary, { projects: choices, timezone, now });
+		const parsed = parseStructured(appointment.summary, {
+			projects: choices,
+			timezone,
+			now,
+			endOfDay: endOfDay ?? undefined
+		});
 
 		const [task] = await db
 			.insert(schema.tasks)

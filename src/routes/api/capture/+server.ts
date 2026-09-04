@@ -8,7 +8,12 @@
 
 import { json } from '@sveltejs/kit';
 import { currentUser } from '$lib/server/auth';
-import { createTask, getSettings, listProjects } from '$lib/server/db/queries';
+import {
+	createTask,
+	getSettings,
+	latestWorkingHour,
+	listProjects
+} from '$lib/server/db/queries';
 import { parseQuickAdd } from '$lib/server/parse';
 import { replan } from '$lib/server/planner';
 import { DEFAULT_MIN_BLOCK_MINUTES } from '$lib/scheduler/types';
@@ -25,6 +30,7 @@ export const POST: RequestHandler = async (event) => {
 	const settings = await getSettings(user.id);
 	const timezone = settings?.timezone ?? 'Europe/Paris';
 	const projects = await listProjects(user.id);
+	const endOfDay = await latestWorkingHour(user.id);
 
 	// Dates resolve against when the user TYPED it, not when the queue drained.
 	// "demain", captured on a train on Monday and flushed on Wednesday, still
@@ -35,7 +41,9 @@ export const POST: RequestHandler = async (event) => {
 	const parsed = await parseQuickAdd(text, {
 		projects: projects.map((p) => ({ id: p.id, name: p.name, clientName: p.clientName })),
 		timezone,
-		now
+		now,
+		hoursPerDay: settings?.hoursPerDay,
+		endOfDay: endOfDay ?? undefined
 	});
 
 	const task = await createTask(user.id, {
