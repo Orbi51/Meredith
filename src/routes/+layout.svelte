@@ -121,7 +121,23 @@
 		['/projects', 'Projects'],
 		['/settings', 'Settings']
 	] as const;
+
+	/**
+	 * The window title. Without one, an installed app shows a bare URL in the
+	 * taskbar and alt-tab — the single clearest tell that something is a web
+	 * page wearing a costume.
+	 */
+	const pageName = $derived(
+		(links as readonly (readonly [string, string])[]).find(
+			([href]) => href === page.url.pathname
+		)?.[1] ?? (page.url.pathname === '/add' ? 'Capture' : null)
+	);
+	const title = $derived(pageName ? `${pageName} · Meredith` : 'Meredith');
 </script>
+
+<svelte:head>
+	<title>{title}</title>
+</svelte:head>
 
 <svelte:window onkeydown={onKeydown} />
 
