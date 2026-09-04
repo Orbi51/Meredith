@@ -27,6 +27,10 @@ export type ProjectEconomics = {
 	/** The fee in euros. Null when a rate has not been set for a foreign fee. */
 	feeEur: number | null;
 	agreedHours: number | null;
+	/** Days sold, when the job was quoted as a day rate. */
+	agreedDays: number | null;
+	/** The rate that was quoted: fee ÷ days sold. What you told the client. */
+	quotedDayRateEur: number | null;
 	/** Hours actually worked: confirmed blocks, using their recorded actuals. */
 	actualHours: number;
 	/** Hours still planned but not yet worked. */
@@ -38,16 +42,28 @@ export type ProjectEconomics = {
 	 */
 	effectiveRateEur: number | null;
 	/**
+	 * The same number expressed per day, which is how a freelance rate is
+	 * actually quoted and compared. Hours are the unit the scheduler thinks in;
+	 * days are the unit the invoice thinks in.
+	 */
+	effectiveDayRateEur: number | null;
+	/**
 	 * The rate if every remaining planned hour is also spent. Lower than
 	 * `effectiveRateEur` while work is outstanding — this is the honest one to
 	 * quote yourself when deciding whether to take similar work again.
 	 */
 	projectedRateEur: number | null;
+	projectedDayRateEur: number | null;
+	/** Days actually worked, at this user's definition of a day. */
+	actualDays: number;
 	/** Actual hours over agreed hours, when both are known. */
 	overrunHours: number | null;
 };
 
-export async function projectEconomics(userId: string): Promise<ProjectEconomics[]> {
+export async function projectEconomics(
+	userId: string,
+	hoursPerDay = 7
+): Promise<ProjectEconomics[]> {
 	const projects = await db
 		.select()
 		.from(schema.projects)
@@ -94,6 +110,20 @@ export async function projectEconomics(userId: string): Promise<ProjectEconomics
 			// euro sign on it.
 			const feeEur = toEur(fee, project.fxRateToEur, project.currency);
 
+			// One definition of a day, taken from settings, used for the estimate
+			// parser and for this. Guard against a nonsensical setting rather than
+			// dividing by zero.
+			const perDay = hoursPerDay > 0 ? hoursPerDay : 7;
+			const asDayRate = (hourly: number | null) =>
+				hourly === null ? null : round(hourly * perDay);
+
+			const effectiveRateEur =
+				feeEur !== null && actualHours > 0 ? round(feeEur / actualHours) : null;
+			const projectedRateEur =
+				feeEur !== null && actualHours + plannedHours > 0
+					? round(feeEur / (actualHours + plannedHours))
+					: null;
+
 			return {
 				projectId: project.id,
 				name: project.name,
@@ -105,15 +135,21 @@ export async function projectEconomics(userId: string): Promise<ProjectEconomics
 				fxRateAt: project.fxRateAt,
 				feeEur,
 				agreedHours: project.agreedHours,
+				agreedDays: project.agreedDays,
+				// What was quoted, as opposed to what it is turning out to be.
+				quotedDayRateEur:
+					feeEur !== null && project.agreedDays && project.agreedDays > 0
+						? round(feeEur / project.agreedDays)
+						: null,
 				actualHours,
 				plannedHours,
+				actualDays: round(actualHours / perDay),
 				// Dividing by zero hours would report an infinite rate on a project
 				// nobody has worked yet, which is worse than saying nothing.
-				effectiveRateEur: feeEur !== null && actualHours > 0 ? round(feeEur / actualHours) : null,
-				projectedRateEur:
-					feeEur !== null && actualHours + plannedHours > 0
-						? round(feeEur / (actualHours + plannedHours))
-						: null,
+				effectiveRateEur,
+				effectiveDayRateEur: asDayRate(effectiveRateEur),
+				projectedRateEur,
+				projectedDayRateEur: asDayRate(projectedRateEur),
 				overrunHours:
 					project.agreedHours !== null ? round(actualHours - project.agreedHours) : null
 			};

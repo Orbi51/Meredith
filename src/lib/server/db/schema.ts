@@ -51,6 +51,14 @@ export const settings = pgTable('settings', {
 	/** Incremental sync token from the Google events.list response. */
 	syncToken: text('sync_token'),
 	weeklyCapacityHours: doublePrecision('weekly_capacity_hours').notNull().default(35),
+	/**
+	 * How many working hours make a "day".
+	 *
+	 * ONE definition, used everywhere: it turns "2j" into hours when parsing a
+	 * capture, and it turns an hourly rate into the day rate a freelancer
+	 * actually quotes. Two definitions of a day would drift apart.
+	 */
+	hoursPerDay: doublePrecision('hours_per_day').notNull().default(7),
 	defaultBufferPercent: integer('default_buffer_percent').notNull().default(0),
 	calibrationEnabled: boolean('calibration_enabled').notNull().default(true),
 	horizonDays: integer('horizon_days').notNull().default(21),
@@ -79,6 +87,8 @@ export const projects = pgTable('projects', {
 	clientName: text('client_name'),
 	deadline: timestamp('deadline', { withTimezone: true }),
 	agreedHours: doublePrecision('agreed_hours'),
+	/** Days sold, when the job was quoted as a day rate rather than a lump sum. */
+	agreedDays: doublePrecision('agreed_days'),
 	/** Used with actual hours worked to show an effective hourly rate. */
 	agreedFee: doublePrecision('agreed_fee'),
 	/**

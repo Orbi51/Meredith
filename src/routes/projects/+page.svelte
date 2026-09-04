@@ -18,8 +18,10 @@
 
 <h1 class="text-xl font-semibold">Projects</h1>
 <p class="mt-1 max-w-2xl text-sm text-neutral-600 dark:text-neutral-400">
-	Fees can be agreed in any currency. Everything is converted to euros at a rate you fix, so the
-	hourly rate you compare jobs on is always in the money you actually bank.
+	Quote a job by the day, or as a lump sum. Rates are shown per day — the unit you actually quote
+	in — and always in euros, whatever currency the fee was agreed in. A day is
+	<strong>{data.hoursPerDay}h</strong>, which you can change in
+	<a class="underline" href="/settings">settings</a>.
 </p>
 
 {#if form?.message}
@@ -76,7 +78,10 @@
 				</td>
 
 				<td class="py-2">
-					{project.actualHours}h
+					{project.actualDays}d
+					<span class="block text-xs text-neutral-400 dark:text-neutral-500">
+						{project.actualHours}h
+					</span>
 					{#if project.plannedHours > 0}
 						<span class="block text-xs text-neutral-400 dark:text-neutral-500">+{project.plannedHours}h planned</span>
 					{/if}
@@ -87,11 +92,33 @@
 					{/if}
 				</td>
 
+				<!-- Day rate first: it is the unit the job was quoted in and the one
+				     worth comparing against the next offer. The hourly figure is the
+				     same number, kept small. -->
 				<td class="py-2">
-					{project.effectiveRateEur !== null ? project.effectiveRateEur + ' €/h' : '—'}
+					{#if project.effectiveDayRateEur !== null}
+						{project.effectiveDayRateEur} €/day
+						<span class="block text-xs text-neutral-400 dark:text-neutral-500">
+							{project.effectiveRateEur} €/h
+						</span>
+					{:else}
+						—
+					{/if}
 				</td>
 				<td class="py-2">
-					{project.projectedRateEur !== null ? project.projectedRateEur + ' €/h' : '—'}
+					{#if project.projectedDayRateEur !== null}
+						{project.projectedDayRateEur} €/day
+						<span class="block text-xs text-neutral-400 dark:text-neutral-500">
+							{project.projectedRateEur} €/h
+						</span>
+						{#if project.quotedDayRateEur !== null && project.projectedDayRateEur < project.quotedDayRateEur}
+							<span class="block text-xs text-red-700 dark:text-red-400">
+								quoted {project.quotedDayRateEur} €/day
+							</span>
+						{/if}
+					{:else}
+						—
+					{/if}
 				</td>
 				<td class="py-2 text-xs text-neutral-500 dark:text-neutral-400">{project.status}</td>
 
@@ -128,13 +155,36 @@
 								/>
 							</label>
 							<label class="block">
-								<span class="text-xs text-neutral-500 dark:text-neutral-400">Agreed fee</span>
+								<span class="text-xs text-neutral-500 dark:text-neutral-400">Day rate</span>
+								<input
+									name="dayRate"
+									type="number"
+									step="0.01"
+									value={project.quotedDayRateEur ?? ''}
+									placeholder="e.g. 450"
+									class="mt-1 w-24 rounded border border-neutral-300 dark:border-neutral-700 px-2 py-1 text-sm"
+									title="Day rate × days sold becomes the fee. Leave blank to enter a lump sum instead."
+								/>
+							</label>
+							<label class="block">
+								<span class="text-xs text-neutral-500 dark:text-neutral-400">Days sold</span>
+								<input
+									name="agreedDays"
+									type="number"
+									step="0.5"
+									value={project.agreedDays ?? ''}
+									class="mt-1 w-20 rounded border border-neutral-300 dark:border-neutral-700 px-2 py-1 text-sm"
+								/>
+							</label>
+							<label class="block">
+								<span class="text-xs text-neutral-500 dark:text-neutral-400">or total fee</span>
 								<input
 									name="agreedFee"
 									type="number"
 									step="0.01"
 									value={project.agreedFee ?? ''}
 									class="mt-1 w-28 rounded border border-neutral-300 dark:border-neutral-700 px-2 py-1 text-sm"
+									title="Ignored when a day rate and days sold are both given."
 								/>
 							</label>
 							<label class="block">

@@ -51,8 +51,8 @@ export function splitSegments(text: string): string[] {
 }
 
 /** Is this segment nothing but a duration? */
-function wholeSegmentEstimate(segment: string): number | null {
-	const found = extractEstimate(segment);
+function wholeSegmentEstimate(segment: string, hoursPerDay?: number): number | null {
+	const found = extractEstimate(segment, hoursPerDay);
 	if (!found) return null;
 	// "6h" is an estimate; "render 6h of fog" is a title that mentions one.
 	return found.matched.trim().length === segment.length ? found.value : null;
@@ -80,7 +80,7 @@ function matchKnownProject(segment: string, projects: ProjectLike[]): ProjectLik
 
 export function parseStructured(
 	text: string,
-	options: { projects: ProjectLike[]; timezone: string; now: Date }
+	options: { projects: ProjectLike[]; timezone: string; now: Date; hoursPerDay?: number }
 ): StructuredCapture {
 	const segments = splitSegments(text);
 
@@ -93,7 +93,7 @@ export function parseStructured(
 	const prose: { index: number; value: string }[] = [];
 
 	segments.forEach((segment, index) => {
-		const asEstimate = wholeSegmentEstimate(segment);
+		const asEstimate = wholeSegmentEstimate(segment, options.hoursPerDay);
 		if (asEstimate !== null && estimateHours === null) {
 			estimateHours = asEstimate;
 			return;

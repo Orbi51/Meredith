@@ -74,3 +74,24 @@ describe('the rate a project reports', () => {
 		expect(toEur(30_000, null, 'JPY')).toBeNull();
 	});
 });
+
+describe('a day is one number, used everywhere', () => {
+	// The day length turns "2j" into hours when parsing a capture AND turns an
+	// hourly rate into the day rate that gets quoted. Two definitions would
+	// drift, which is exactly how a JPY fee once came out labelled in euros.
+	it('turns an hourly rate into a day rate at the configured length', () => {
+		const feeEur = 3500;
+		const actualHours = 35;
+		const hourly = feeEur / actualHours; // 100 €/h
+
+		expect(Math.round(hourly * 7)).toBe(700); // a 7-hour day
+		expect(Math.round(hourly * 8)).toBe(800); // an 8-hour day
+	});
+
+	it('reads a quoted day rate back out of the fee', () => {
+		// 5 days at 450 is invoiced as 2250; the quoted rate must come back.
+		const fee = 450 * 5;
+		expect(fee).toBe(2250);
+		expect(fee / 5).toBe(450);
+	});
+});

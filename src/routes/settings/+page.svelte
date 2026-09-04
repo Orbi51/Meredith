@@ -105,6 +105,19 @@
 			/>
 		</label>
 		<label class="block text-sm">
+			<span class="text-xs text-neutral-500 dark:text-neutral-400">Hours in a working day</span>
+			<input
+				name="hoursPerDay"
+				type="number"
+				min="1"
+				max="16"
+				step="0.5"
+				value={data.settings.hoursPerDay}
+				class="mt-1 w-24 rounded border border-neutral-300 dark:border-neutral-700 px-2 py-1"
+				title="Used for both '2j' in a capture and the €/day rates on the projects page — one definition, so they cannot disagree."
+			/>
+		</label>
+		<label class="block text-sm">
 			<span class="text-xs text-neutral-500 dark:text-neutral-400">Planning horizon (days)</span>
 			<input
 				name="horizonDays"

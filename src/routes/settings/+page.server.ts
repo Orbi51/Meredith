@@ -37,6 +37,7 @@ export const load: PageServerLoad = async (event) => {
 		settings: {
 			timezone: settings?.timezone ?? 'Europe/Paris',
 			horizonDays: settings?.horizonDays ?? 21,
+			hoursPerDay: settings?.hoursPerDay ?? 7,
 			targetCalendarId: settings?.targetCalendarId ?? null,
 			calibrationEnabled: settings?.calibrationEnabled ?? true
 		},
@@ -90,9 +91,13 @@ export const actions: Actions = {
 		await replaceWorkingHours(user.id, hours);
 
 		const horizon = Number(form.get('horizonDays') ?? 21);
+		const perDay = Number(form.get('hoursPerDay') ?? 7);
 		await updateSettings(user.id, {
 			timezone: String(form.get('timezone') ?? 'Europe/Paris'),
-			horizonDays: Number.isFinite(horizon) ? Math.min(90, Math.max(1, horizon)) : 21
+			horizonDays: Number.isFinite(horizon) ? Math.min(90, Math.max(1, horizon)) : 21,
+			// Clamped: a zero would divide by zero in every rate on the projects
+			// page, and a 24-hour day is not a day.
+			hoursPerDay: Number.isFinite(perDay) ? Math.min(16, Math.max(1, perDay)) : 7
 		});
 
 		try {

@@ -25,8 +25,14 @@ export type Extraction<T> = {
 
 /** When only a day is given, work is due by the end of the working day. */
 const DEFAULT_DEADLINE_TIME = '18:00';
-/** A "day" of work, for estimates written as "2 days". */
-const HOURS_PER_WORKING_DAY = 7;
+/**
+ * A "day" of work, for estimates written as "2 days" or "2j".
+ *
+ * The default only applies when no setting is passed. The real value lives in
+ * settings.hoursPerDay and is threaded in, because the SAME number has to turn
+ * a day rate into an hourly one — two definitions of a day would drift.
+ */
+export const DEFAULT_HOURS_PER_WORKING_DAY = 7;
 
 const WEEKDAYS: Record<string, number> = {
 	sunday: 0, dimanche: 0,
@@ -58,7 +64,10 @@ const MONTHS: Record<string, number> = {
  * "2 jours". Deliberately conservative: a bare number is NOT an estimate,
  * because "rev2" and "shot 3" are not durations.
  */
-export function extractEstimate(text: string): Extraction<number> {
+export function extractEstimate(
+	text: string,
+	hoursPerDay: number = DEFAULT_HOURS_PER_WORKING_DAY
+): Extraction<number> {
 	// "1h30" / "1 h 30" — hours and minutes together, checked first so the
 	// simpler hour pattern cannot swallow the "1h" and leave "30" behind.
 	const hm = text.match(/(?<![\w.])~?\s*(\d{1,2})\s*h\s*(\d{1,2})(?![\w.])/i);
@@ -82,12 +91,12 @@ export function extractEstimate(text: string): Extraction<number> {
 	// enough in a freelancer's own notes to be worth supporting.
 	const days = text.match(/(?<![\w.])~?\s*(\d+(?:[.,]\d+)?)\s*(?:d|j|days?|jours?|journées?|journees?)(?![\w])/i);
 	if (days) {
-		const value = Number((days[1] as string).replace(',', '.')) * HOURS_PER_WORKING_DAY;
+		const value = Number((days[1] as string).replace(',', '.')) * hoursPerDay;
 		return { value, matched: days[0] };
 	}
 
 	const half = text.match(/\b(?:half a day|demi[- ]?journée|demi[- ]?journee)\b/i);
-	if (half) return { value: HOURS_PER_WORKING_DAY / 2, matched: half[0] };
+	if (half) return { value: hoursPerDay / 2, matched: half[0] };
 
 	return null;
 }

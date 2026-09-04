@@ -26,6 +26,14 @@ describe('extractEstimate', () => {
 		expect(extractEstimate(text)?.value).toBe(expected);
 	});
 
+	it('uses the configured day length, not a hardcoded one', () => {
+		// The same setting drives the €/day rates on the projects page, so a
+		// freelancer on 8-hour days gets 8-hour days in both places.
+		expect(extractEstimate('modélisation 2j', 7)?.value).toBe(14);
+		expect(extractEstimate('modélisation 2j', 8)?.value).toBe(16);
+		expect(extractEstimate('retouches demi-journée', 8)?.value).toBe(4);
+	});
+
 	it('does not treat a bare number as a duration', () => {
 		// "rev2" and "shot 3" are not estimates. Guessing here would silently
 		// reserve the wrong amount of the week.

@@ -17,9 +17,13 @@ import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
 	const user = await requireUser(event);
-	const [settings, economics, rows] = await Promise.all([
-		getSettings(user.id),
-		projectEconomics(user.id),
+	const settings = await getSettings(user.id);
+	const hoursPerDay = settings?.hoursPerDay ?? 7;
+
+	const [economics, rows] = await Promise.all([
+		// The day length comes from settings so that "2j" in a capture and
+		// "€/day" here can never mean different things.
+		projectEconomics(user.id, hoursPerDay),
 		db.select().from(schema.projects).where(eq(schema.projects.userId, user.id))
 	]);
 
@@ -28,6 +32,7 @@ export const load: PageServerLoad = async (event) => {
 	return {
 		currencies: CURRENCIES,
 		timezone: settings?.timezone ?? 'Europe/Paris',
+		hoursPerDay,
 		// Everything money-related comes from projectEconomics, which is the one
 		// place currency conversion happens. Only presentation fields are added.
 		projects: economics.map((project) => {
@@ -76,12 +81,21 @@ export const actions: Actions = {
 		const deadlineRaw = String(form.get('deadline') ?? '').trim();
 		const deadline = deadlineRaw ? new Date(deadlineRaw) : null;
 
+		// A job quoted as "5 days at 500 a day" is entered that way. The fee is
+		// what gets invoiced, so it is still what we store — computed here rather
+		// than making the user do the multiplication.
+		const dayRate = number('dayRate');
+		const agreedDays = number('agreedDays');
+		const feeFromDays =
+			dayRate !== null && agreedDays !== null ? Math.round(dayRate * agreedDays * 100) / 100 : null;
+
 		const status = String(form.get('status') ?? 'active');
 		const values: Partial<typeof schema.projects.$inferInsert> = {
 			name: String(form.get('name') ?? '').trim() || undefined,
 			clientName: String(form.get('clientName') ?? '').trim() || null,
-			agreedFee: number('agreedFee'),
+			agreedFee: feeFromDays ?? number('agreedFee'),
 			agreedHours: number('agreedHours'),
+			agreedDays,
 			currency,
 			deadline: deadline && !Number.isNaN(deadline.getTime()) ? deadline : null,
 			color: String(form.get('color') ?? '') || undefined,

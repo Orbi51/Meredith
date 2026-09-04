@@ -39,7 +39,7 @@ export type ProjectChoice = { id: string; name: string; clientName: string | nul
 
 export async function parseQuickAdd(
 	text: string,
-	options: { projects: ProjectChoice[]; timezone: string; now: Date }
+	options: { projects: ProjectChoice[]; timezone: string; now: Date; hoursPerDay?: number }
 ): Promise<ParsedTask> {
 	const trimmed = text.trim();
 	if (!trimmed) {
@@ -69,7 +69,7 @@ export async function parseQuickAdd(
 	}
 
 	// ------------------------------------------------------------------ step 1
-	const estimate = extractEstimate(trimmed);
+	const estimate = extractEstimate(trimmed, options.hoursPerDay);
 	const deadline = extractDeadline(trimmed, options.now, options.timezone);
 	const kind = detectKind(trimmed);
 

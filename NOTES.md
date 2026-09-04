@@ -250,6 +250,21 @@ value drifts on every page load is not a number you can plan against, and for
 the books the rate that counts is the one on the invoice date — which is why
 the fetch takes a date, and a hand-entered rate always wins.
 
+### A working day is one number
+
+`settings.hoursPerDay` (default 7) is used for two things that must agree:
+
+- turning `2j` into hours when parsing a capture;
+- turning an hourly rate into the **day rate** shown on the projects page.
+
+Two separate definitions would drift, which is exactly how a 30 000 JPY fee
+once came out labelled `30000€`. The parser takes it as an argument rather than
+importing a constant, so there is nowhere for a second value to hide.
+
+Rates are shown per day first, hourly underneath: a day rate is what gets
+quoted and compared against the next offer, and it is the unit an invoice is
+written in. Hours remain the unit the scheduler thinks in.
+
 ### Notifications are mostly about not sending things
 
 Two messages exist: a morning brief when something is planned, and an alert
