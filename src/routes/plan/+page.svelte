@@ -20,18 +20,18 @@
 <div class="flex items-baseline justify-between">
 	<h1 class="text-xl font-semibold">Weekly plan · {data.currentWeek}</h1>
 	{#if data.alreadyDoneThisWeek}
-		<span class="text-sm text-green-700">done for this week</span>
+		<span class="text-sm text-green-700 dark:text-green-400">done for this week</span>
 	{/if}
 </div>
 
 {#each data.warnings as warning (warning)}
-	<p class="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800">{warning}</p>
+	<p class="mt-2 rounded bg-amber-50 dark:bg-amber-950 p-2 text-sm text-amber-800 dark:text-amber-300">{warning}</p>
 {/each}
 
 <!-- ───────────────────────────────────────────────── step 1: review last week -->
 <section class="mt-8">
 	<h2 class="font-medium">1 · Last week</h2>
-	<p class="mt-1 text-sm text-neutral-600">
+	<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
 		{#if data.review.length === 0}
 			Nothing was planned last week — nothing to review.
 		{:else}
@@ -46,12 +46,12 @@
 	{#if data.review.length > 0}
 		<ul class="mt-3 space-y-1">
 			{#each data.review as block (block.id)}
-				<li class="flex flex-wrap items-center gap-2 border-b border-neutral-100 py-1.5 text-sm">
-					<span class="w-40 font-mono text-xs text-neutral-500">
+				<li class="flex flex-wrap items-center gap-2 border-b border-neutral-100 dark:border-neutral-800 py-1.5 text-sm">
+					<span class="w-40 font-mono text-xs text-neutral-500 dark:text-neutral-400">
 						{day(block.start)} {time(block.start)}
 					</span>
 					<span class="min-w-48 flex-1">{block.title}</span>
-					<span class="text-xs text-neutral-500">{block.plannedHours}h planned</span>
+					<span class="text-xs text-neutral-500 dark:text-neutral-400">{block.plannedHours}h planned</span>
 
 					{#if block.status === 'planned'}
 						<form
@@ -70,14 +70,14 @@
 								<button
 									name="outcome"
 									{value}
-									class="rounded border border-neutral-300 px-2 py-0.5 text-xs hover:bg-neutral-100"
+									class="rounded border border-neutral-300 dark:border-neutral-700 px-2 py-0.5 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800"
 								>
 									{label}
 								</button>
 							{/each}
 						</form>
 					{:else}
-						<span class="text-xs text-neutral-500">
+						<span class="text-xs text-neutral-500 dark:text-neutral-400">
 							{block.status}{#if block.actualHours !== null}
 								· {block.actualHours}h{/if}
 						</span>
@@ -91,16 +91,16 @@
 <!-- ──────────────────────────────────────────── step 2: fixed commitments -->
 <section class="mt-8">
 	<h2 class="font-medium">2 · Already committed</h2>
-	<p class="mt-1 text-sm text-neutral-600">
+	<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
 		Appointments in your calendar for the rest of this week. Read-only — this is context.
 	</p>
 	{#if data.appointments.length === 0}
-		<p class="mt-2 text-sm text-neutral-500">Nothing in the calendar.</p>
+		<p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Nothing in the calendar.</p>
 	{:else}
 		<ul class="mt-2 space-y-1 text-sm">
 			{#each data.appointments as appointment (appointment.start + appointment.summary)}
 				<li class="flex gap-3">
-					<span class="w-40 font-mono text-xs text-neutral-500">
+					<span class="w-40 font-mono text-xs text-neutral-500 dark:text-neutral-400">
 						{day(appointment.start)}
 						{#if !appointment.allDay}{time(appointment.start)}–{time(appointment.end)}{:else}all day{/if}
 					</span>
@@ -116,51 +116,51 @@
 	<h2 class="font-medium">3 · What you actually have</h2>
 	<div class="mt-2 flex items-baseline gap-3">
 		<span class="text-4xl font-semibold">{data.capacity.availableHours}h</span>
-		<span class="text-sm text-neutral-600">
+		<span class="text-sm text-neutral-600 dark:text-neutral-400">
 			{data.capacity.workingHours}h of working hours − {data.capacity.appointmentHours}h of
 			appointments
 		</span>
 	</div>
-	<p class="mt-1 text-sm text-neutral-500">This is the budget for the rest of this ritual.</p>
+	<p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">This is the budget for the rest of this ritual.</p>
 </section>
 
 <!-- ───────────────────────────────────────────── step 4: deadline pressure -->
 <section class="mt-8">
 	<h2 class="font-medium">4 · Deadline pressure</h2>
-	<p class="mt-1 text-sm text-neutral-600">
+	<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
 		Every deadline in the next three weeks, least room first. Slack is measured in
 		<em>working</em> hours, not days on a calendar.
 	</p>
 
 	{#if data.pressure.length === 0}
-		<p class="mt-2 text-sm text-neutral-500">No deadlines in the next three weeks.</p>
+		<p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">No deadlines in the next three weeks.</p>
 	{:else}
 		<table class="mt-3 w-full text-sm">
-			<thead class="text-left text-xs text-neutral-500">
+			<thead class="text-left text-xs text-neutral-500 dark:text-neutral-400">
 				<tr><th class="py-1">Task</th><th>Due</th><th>Left to do</th><th>Slack</th></tr>
 			</thead>
 			<tbody>
 				{#each data.pressure as item (item.taskId)}
-					<tr class="border-t border-neutral-100 {item.slackHours < 0 ? 'bg-red-50' : ''}">
+					<tr class="border-t border-neutral-100 dark:border-neutral-800 {item.slackHours < 0 ? 'bg-red-50 dark:bg-red-950' : ''}">
 						<td class="py-1.5">
-							{#if item.projectName}<span class="text-neutral-500">[{item.projectName}]</span>{/if}
+							{#if item.projectName}<span class="text-neutral-500 dark:text-neutral-400">[{item.projectName}]</span>{/if}
 							{item.title}
 							{#if item.waiting}
-								<span class="ml-1 rounded bg-amber-100 px-1 text-xs text-amber-800">waiting</span>
+								<span class="ml-1 rounded bg-amber-100 dark:bg-amber-900 px-1 text-xs text-amber-800 dark:text-amber-300">waiting</span>
 							{/if}
 						</td>
 						<td>{dayTime(item.deadline)}</td>
 						<td>
 							{item.remainingHours}h
 							{#if item.multiplier !== 1 && item.rawHours !== null}
-								<span class="block text-xs text-amber-700">
+								<span class="block text-xs text-amber-700 dark:text-amber-400">
 									you said {item.rawHours}h (×{item.multiplier})
 								</span>
 							{:else if item.inferred}
-								<span class="block text-xs text-neutral-400">inferred</span>
+								<span class="block text-xs text-neutral-400 dark:text-neutral-500">inferred</span>
 							{/if}
 						</td>
-						<td class={item.slackHours < 0 ? 'font-medium text-red-700' : ''}>
+						<td class={item.slackHours < 0 ? 'font-medium text-red-700 dark:text-red-400' : ''}>
 							{item.slackHours}h
 						</td>
 					</tr>
@@ -173,13 +173,13 @@
 <!-- ───────────────────────────────────────────────────────── step 5: commit -->
 <section class="mt-8">
 	<h2 class="font-medium">5 · Commit</h2>
-	<p class="mt-1 text-sm text-neutral-600">
+	<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
 		What are you promising to do this week? The total is what matters, not the order.
 	</p>
 
 	<!-- The budget line. §9: make the overrun impossible to miss. -->
 	<div
-		class="mt-3 rounded p-3 {overrun ? 'bg-red-50 text-red-900' : 'bg-neutral-100 text-neutral-800'}"
+		class="mt-3 rounded p-3 {overrun ? 'bg-red-50 dark:bg-red-950 text-red-900 dark:text-red-200' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200'}"
 	>
 		<span class="text-2xl font-semibold">{data.capacity.committedHours}h</span>
 		<span class="text-sm">committed of {data.capacity.availableHours}h available</span>
@@ -201,7 +201,7 @@
 
 	<ul class="mt-3 space-y-1">
 		{#each data.committable as task (task.taskId)}
-			<li class="flex flex-wrap items-center gap-2 border-b border-neutral-100 py-1.5 text-sm">
+			<li class="flex flex-wrap items-center gap-2 border-b border-neutral-100 dark:border-neutral-800 py-1.5 text-sm">
 				<form
 					method="POST"
 					action="?/commit"
@@ -214,28 +214,28 @@
 					<input type="hidden" name="committed" value={String(!task.committed)} />
 					<button
 						class="rounded border px-2 py-0.5 text-xs {task.committed
-							? 'border-neutral-900 bg-neutral-900 text-white'
-							: 'border-neutral-300 hover:bg-neutral-100'}"
+							? 'border-neutral-900 dark:border-neutral-100 bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900'
+							: 'border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800'}"
 					>
 						{task.committed ? 'committed' : 'commit'}
 					</button>
 				</form>
 
 				<span class="min-w-48 flex-1">
-					{#if task.projectName}<span class="text-neutral-500">[{task.projectName}]</span>{/if}
+					{#if task.projectName}<span class="text-neutral-500 dark:text-neutral-400">[{task.projectName}]</span>{/if}
 					{task.title}
 				</span>
 
-				<span class="text-xs text-neutral-500">
+				<span class="text-xs text-neutral-500 dark:text-neutral-400">
 					{task.remainingHours}h
 					{#if task.multiplier !== 1 && task.rawHours !== null}
-						<span class="text-amber-700">(you said {task.rawHours}h)</span>
+						<span class="text-amber-700 dark:text-amber-400">(you said {task.rawHours}h)</span>
 					{:else if task.inferred}
-						<span class="text-neutral-400">inferred</span>
+						<span class="text-neutral-400 dark:text-neutral-500">inferred</span>
 					{/if}
 				</span>
 
-				<span class="w-32 text-right text-xs text-neutral-500">
+				<span class="w-32 text-right text-xs text-neutral-500 dark:text-neutral-400">
 					{task.deadline ? dayTime(task.deadline) : 'no deadline'}
 				</span>
 			</li>
@@ -246,24 +246,24 @@
 <!-- ─────────────────────────────────────────────────────── step 6: generate -->
 <section class="mt-8 mb-16">
 	<h2 class="font-medium">6 · Generate</h2>
-	<p class="mt-1 text-sm text-neutral-600">
+	<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
 		Nothing is written to your calendar until you have seen the preview and confirmed it.
 	</p>
 
 	<form method="POST" action="?/preview" class="mt-3 inline-block">
-		<button class="rounded border border-neutral-300 px-3 py-2 text-sm hover:bg-neutral-100">
+		<button class="rounded border border-neutral-300 dark:border-neutral-700 px-3 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800">
 			Preview the plan
 		</button>
 	</form>
 
 	{#if form?.preview}
-		<div class="mt-4 rounded border border-neutral-200 p-3">
+		<div class="mt-4 rounded border border-neutral-200 dark:border-neutral-800 p-3">
 			<h3 class="text-sm font-medium">
 				{form.preview.blocks.length} blocks
 			</h3>
 
 			{#if form.preview.atRisk.length > 0}
-				<div class="mt-2 rounded bg-red-50 p-2 text-sm text-red-800">
+				<div class="mt-2 rounded bg-red-50 dark:bg-red-950 p-2 text-sm text-red-800 dark:text-red-300">
 					<strong>At risk:</strong>
 					<ul class="mt-1 space-y-0.5">
 						{#each form.preview.atRisk as risk (risk.title)}
@@ -277,7 +277,7 @@
 			{/if}
 
 			{#if form.preview.unplaced.length > 0}
-				<div class="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800">
+				<div class="mt-2 rounded bg-amber-50 dark:bg-amber-950 p-2 text-sm text-amber-800 dark:text-amber-300">
 					<strong>Does not fit in the horizon:</strong>
 					<ul class="mt-1 space-y-0.5">
 						{#each form.preview.unplaced as item (item.title)}
@@ -290,19 +290,19 @@
 			<ul class="mt-3 max-h-72 space-y-0.5 overflow-y-auto text-sm">
 				{#each form.preview.blocks as block (block.start + block.title)}
 					<li class="flex gap-3">
-						<span class="w-40 font-mono text-xs text-neutral-500">
+						<span class="w-40 font-mono text-xs text-neutral-500 dark:text-neutral-400">
 							{block.day} {block.time}
 						</span>
 						<span>{block.title}</span>
 						{#if block.pool === 'machine'}
-							<span class="text-xs text-neutral-400">unattended</span>
+							<span class="text-xs text-neutral-400 dark:text-neutral-500">unattended</span>
 						{/if}
 					</li>
 				{/each}
 			</ul>
 
 			<form method="POST" action="?/generate" class="mt-4">
-				<button class="rounded bg-neutral-900 px-3 py-2 text-sm text-white">
+				<button class="rounded bg-neutral-900 dark:bg-neutral-100 px-3 py-2 text-sm text-white dark:text-neutral-900">
 					Write these {form.preview.blocks.length} blocks to my calendar
 				</button>
 			</form>
@@ -310,7 +310,7 @@
 	{/if}
 
 	{#if form?.generated}
-		<div class="mt-4 rounded bg-green-50 p-3 text-sm text-green-900">
+		<div class="mt-4 rounded bg-green-50 dark:bg-green-950 p-3 text-sm text-green-900 dark:text-green-200">
 			Written. {form.generated.blocks} blocks planned
 			{#if form.generated.calendar}
 				· calendar: {form.generated.calendar.inserted} added,
@@ -318,7 +318,7 @@
 				{form.generated.calendar.removed} removed
 			{/if}
 			{#each form.generated.warnings as warning (warning)}
-				<p class="mt-1 text-amber-800">{warning}</p>
+				<p class="mt-1 text-amber-800 dark:text-amber-300">{warning}</p>
 			{/each}
 		</div>
 	{/if}

@@ -207,6 +207,21 @@ tool.
 
 ---
 
+### Dark mode is a class, set before the page paints
+
+The theme is a `dark` class on `<html>`, toggled by a small inline script in
+`app.html` that runs *before* first paint. Doing it in a component paints white
+and then repaints dark — the flash that makes a dark mode feel bolted on. It is
+the one place a blocking inline script earns its place.
+
+"System" is stored as the *absence* of a stored preference, so a machine that
+switches to dark in the evening takes the app with it unless the user has said
+otherwise.
+
+`color-scheme` is set alongside the class. That single line is what makes the
+native date, time, colour and select controls render dark — and this app is
+full of them. Without it they stay glaring white rectangles in a dark page.
+
 ## 4. Not built yet
 
 Honest list, in rough order of how much they matter.
@@ -221,9 +236,12 @@ Honest list, in rough order of how much they matter.
 - **Drag-to-commit.** §11 specifies dragging tasks onto the week; the ritual
   uses click-to-commit. The value is in the running total and the overrun
   warning, both of which work — but this is a real deviation.
-- **Mobile layout.** §11 wants the today view by default with week and tasks a
-  swipe away. The pages are responsive but not designed for a phone, and the
-  ritual is explicitly desktop-only by design.
+- **Mobile layout.** Largely moot now: the phone surface is Google Calendar and
+  the `Meredith inbox` task list, so the app only has to be good on the desktop.
+- **A considered visual design.** Dark mode and project colours are in; the
+  typography, spacing and hierarchy are still whatever Tailwind's defaults gave
+  us. Worth doing after a week of real use, when it is clear which screens
+  actually get looked at.
 - **Files in the share target.** The manifest accepts images and PDFs; the
   handler currently keeps title, text and URL, and ignores attachments.
 - **Per-project calibration.** The maths is there and tested; no project has

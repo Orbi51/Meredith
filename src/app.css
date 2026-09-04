@@ -1,1 +1,21 @@
 @import 'tailwindcss';
+
+/*
+ * Dark mode is driven by a class on <html>, not by prefers-color-scheme alone,
+ * so the user can override the system setting. The class is set before first
+ * paint by a script in app.html — see the note there about why.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Tell the browser which scheme is in play. This is what makes native controls
+ * — and this app is full of them, every date and time picker — render dark
+ * instead of staying a glaring white rectangle in an otherwise dark page.
+ */
+:root {
+	color-scheme: light;
+}
+
+html.dark {
+	color-scheme: dark;
+}

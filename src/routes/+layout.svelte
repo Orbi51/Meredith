@@ -4,6 +4,7 @@
 	import { dev } from '$app/environment';
 	import { page } from '$app/state';
 	import { enqueue, queueSize, startFlushing } from '$lib/offline-queue';
+	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import type { LayoutData } from './$types';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
@@ -125,11 +126,11 @@
 <svelte:window onkeydown={onKeydown} />
 
 <div class="mx-auto max-w-6xl p-4">
-	<nav class="mb-4 flex items-center gap-4 text-sm text-neutral-600">
+	<nav class="mb-4 flex items-center gap-4 text-sm text-neutral-600 dark:text-neutral-400">
 		{#each links as [href, label] (href)}
 			<a
-				class="hover:text-neutral-900 {page.url.pathname === href
-					? 'font-medium text-neutral-900'
+				class="hover:text-neutral-900 dark:hover:text-neutral-100 {page.url.pathname === href
+					? 'font-medium text-neutral-900 dark:text-neutral-100'
 					: ''}"
 				{href}
 			>
@@ -139,20 +140,21 @@
 
 		<span class="ml-auto flex items-center gap-3">
 			{#if !online}
-				<span class="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">offline</span>
+				<span class="rounded bg-amber-100 dark:bg-amber-900 px-2 py-0.5 text-xs text-amber-800 dark:text-amber-300">offline</span>
 			{/if}
+			<ThemeToggle />
 			{#if installPrompt}
 				<button class="text-xs underline" onclick={install}>Install</button>
 			{/if}
 			{#if data.session?.user}
-				<span class="hidden text-xs text-neutral-400 sm:inline">{data.session.user.email}</span>
+				<span class="hidden text-xs text-neutral-400 dark:text-neutral-500 sm:inline">{data.session.user.email}</span>
 				<form method="POST" action="/signout">
-					<button class="cursor-pointer underline hover:text-neutral-900">Sign out</button>
+					<button class="cursor-pointer underline hover:text-neutral-900 dark:hover:text-neutral-100">Sign out</button>
 				</form>
 			{:else}
 				<form method="POST" action="/signin">
 					<input type="hidden" name="providerId" value="google" />
-					<button class="cursor-pointer underline hover:text-neutral-900">
+					<button class="cursor-pointer underline hover:text-neutral-900 dark:hover:text-neutral-100">
 						Sign in with Google
 					</button>
 				</form>
@@ -161,7 +163,7 @@
 	</nav>
 
 	{#if showIosHint}
-		<p class="mb-4 rounded bg-neutral-100 p-3 text-sm text-neutral-700">
+		<p class="mb-4 rounded bg-neutral-100 dark:bg-neutral-800 p-3 text-sm text-neutral-700 dark:text-neutral-300">
 			Add Capacity to your home screen — Share → <strong>Add to Home Screen</strong>. On iPhone
 			that is also what lets it send you notifications.
 			<button class="ml-2 underline" onclick={dismissIosHint}>dismiss</button>
@@ -174,20 +176,20 @@
 				bind:this={quickAdd}
 				name="text"
 				placeholder="storyboard rev2 Studio X ~6h friday   ·   or  Project - task - 6h - friday   (Ctrl+K)"
-				class="w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+				class="w-full rounded border border-neutral-300 dark:border-neutral-700 px-3 py-2 text-sm"
 			/>
-			<button class="rounded bg-neutral-900 px-3 py-2 text-sm whitespace-nowrap text-white">
+			<button class="rounded bg-neutral-900 dark:bg-neutral-100 px-3 py-2 text-sm whitespace-nowrap text-white dark:text-neutral-900">
 				Capture
 			</button>
 		</form>
 
 		{#if pending > 0}
-			<p class="mb-4 text-xs text-amber-700">
+			<p class="mb-4 text-xs text-amber-700 dark:text-amber-400">
 				{pending} capture{pending === 1 ? '' : 's'} waiting to sync — they will be sent when you are
 				back online.
 			</p>
 		{:else if flushed > 0}
-			<p class="mb-4 text-xs text-green-700">
+			<p class="mb-4 text-xs text-green-700 dark:text-green-400">
 				{flushed} offline capture{flushed === 1 ? '' : 's'} synced.
 			</p>
 		{:else}

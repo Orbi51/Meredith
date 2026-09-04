@@ -22,8 +22,8 @@
 {#if data.capacity}
 	<p
 		class="mt-2 inline-block rounded px-2 py-1 text-sm {overcommitted
-			? 'bg-red-50 text-red-800'
-			: 'bg-neutral-100 text-neutral-700'}"
+			? 'bg-red-50 dark:bg-red-950 text-red-800 dark:text-red-300'
+			: 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300'}"
 	>
 		{data.capacity.committedHours}h committed of {data.capacity.availableHours}h available
 		{#if overcommitted}
@@ -34,23 +34,23 @@
 
 <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-7">
 	{#each data.days as day (day.civil)}
-		<div class="rounded border p-2 {day.isToday ? 'border-neutral-900' : 'border-neutral-200'}">
-			<h2 class="text-xs font-medium text-neutral-500">{day.label}</h2>
+		<div class="rounded border p-2 {day.isToday ? 'border-neutral-900 dark:border-neutral-100' : 'border-neutral-200 dark:border-neutral-800'}">
+			<h2 class="text-xs font-medium text-neutral-500 dark:text-neutral-400">{day.label}</h2>
 			{#if day.blocks.length === 0}
-				<p class="mt-2 text-xs text-neutral-300">—</p>
+				<p class="mt-2 text-xs text-neutral-300 dark:text-neutral-600">—</p>
 			{:else}
 				<ul class="mt-2 space-y-1">
 					{#each day.blocks as block (block.id)}
 						<li
-							class="rounded border-l-2 bg-neutral-50 p-1.5 text-xs {block.status === 'skipped'
+							class="rounded border-l-2 bg-neutral-50 dark:bg-neutral-900 p-1.5 text-xs {block.status === 'skipped'
 								? 'opacity-50'
 								: ''}"
 							style="border-left-color: {block.color}"
 						>
-							<span class="font-mono text-neutral-500">{time(block.start)}</span>
+							<span class="font-mono text-neutral-500 dark:text-neutral-400">{time(block.start)}</span>
 							<span class="block">{block.title}</span>
 							{#if block.pool === 'machine'}
-								<span class="text-neutral-400">unattended</span>
+								<span class="text-neutral-400 dark:text-neutral-500">unattended</span>
 							{/if}
 						</li>
 					{/each}

@@ -18,21 +18,21 @@
 <div class="flex items-baseline justify-between">
 	<h1 class="text-xl font-semibold">Tasks</h1>
 	<form method="POST" action="?/replan">
-		<button class="text-sm underline hover:text-neutral-900">Replan now</button>
+		<button class="text-sm underline hover:text-neutral-900 dark:hover:text-neutral-100">Replan now</button>
 	</form>
 </div>
 
 {#if form?.message}
-	<p class="mt-2 rounded bg-neutral-100 p-2 text-xs text-neutral-700">{form.message}</p>
+	<p class="mt-2 rounded bg-neutral-100 dark:bg-neutral-800 p-2 text-xs text-neutral-700 dark:text-neutral-300">{form.message}</p>
 {/if}
 
 {#if data.tasks.length === 0}
-	<p class="mt-6 text-sm text-neutral-500">
+	<p class="mt-6 text-sm text-neutral-500 dark:text-neutral-400">
 		Nothing captured yet. <a class="underline" href="/add">Add a task</a>.
 	</p>
 {:else}
 	<table class="mt-4 w-full text-sm">
-		<thead class="text-left text-xs text-neutral-500">
+		<thead class="text-left text-xs text-neutral-500 dark:text-neutral-400">
 			<tr>
 				<th class="py-1">Task</th>
 				<th>Estimate</th>
@@ -44,51 +44,57 @@
 		</thead>
 		<tbody>
 			{#each data.tasks as task (task.id)}
-				<tr class="border-t border-neutral-200 align-top">
+				<tr class="border-t border-neutral-200 dark:border-neutral-800 align-top">
 					<td class="py-2">
+						{#if task.projectColor}
+							<span
+								class="mr-1 inline-block h-2 w-2 rounded-full align-middle"
+								style="background:{task.projectColor}"
+							></span>
+						{/if}
 						{#if task.projectName}
-							<span class="text-neutral-500">[{task.projectName}]</span>
+							<span class="text-neutral-500 dark:text-neutral-400">[{task.projectName}]</span>
 						{/if}
 						{task.title}
-						<span class="ml-1 text-xs text-neutral-400">{task.kind}</span>
+						<span class="ml-1 text-xs text-neutral-400 dark:text-neutral-500">{task.kind}</span>
 						{#if task.source === 'calendar'}
 							<span
-								class="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-xs text-sky-800"
+								class="ml-1 rounded bg-sky-100 dark:bg-sky-900 px-1.5 py-0.5 text-xs text-sky-800 dark:text-sky-300"
 								title="Adopted from your Google Calendar. Its time is fixed there, so the scheduler leaves it alone."
 							>
 								from calendar
 							</span>
 						{/if}
 						{#if task.waitingReason}
-							<span class="block text-xs text-amber-700">waiting: {task.waitingReason}</span>
+							<span class="block text-xs text-amber-700 dark:text-amber-400">waiting: {task.waitingReason}</span>
 						{/if}
 					</td>
 
 					<td class="py-2">
 						<!-- Raw and calibrated side by side, always (§6). -->
 						{#if task.inferred}
-							<span class="text-neutral-500">{task.effectiveHours}h</span>
-							<span class="block text-xs text-neutral-400">inferred from past work</span>
+							<span class="text-neutral-500 dark:text-neutral-400">{task.effectiveHours}h</span>
+							<span class="block text-xs text-neutral-400 dark:text-neutral-500">inferred from past work</span>
 						{:else if task.multiplier !== 1}
 							<span>{task.rawHours}h</span>
-							<span class="block text-xs text-amber-700">
+							<span class="block text-xs text-amber-700 dark:text-amber-400">
 								scheduled as {task.effectiveHours}h (×{task.multiplier})
 							</span>
 						{:else}
 							<span>{task.rawHours}h</span>
 						{/if}
 						{#if task.hoursAlreadyDone > 0}
-							<span class="block text-xs text-neutral-400">{task.hoursAlreadyDone}h done</span>
+							<span class="block text-xs text-neutral-400 dark:text-neutral-500">{task.hoursAlreadyDone}h done</span>
 						{/if}
 					</td>
 
 					<td class="py-2">
 						{task.plannedHours}h
 						{#if task.source === 'calendar'}
-							<span class="block text-xs text-neutral-400">fixed in your calendar</span>
+							<span class="block text-xs text-neutral-400 dark:text-neutral-500">fixed in your calendar</span>
 						{/if}
 						{#if task.source !== 'calendar' && task.status !== 'waiting' && task.plannedHours + task.hoursAlreadyDone < task.effectiveHours - 0.01}
-							<span class="block text-xs text-red-700">
+							<span class="block text-xs text-red-700 dark:text-red-400">
 								{Math.round((task.effectiveHours - task.plannedHours - task.hoursAlreadyDone) * 100) /
 									100}h unplaced
 							</span>
@@ -102,7 +108,7 @@
 							<input type="hidden" name="taskId" value={task.id} />
 							<select
 								name="status"
-								class="rounded border border-neutral-300 px-1 py-0.5 text-xs"
+								class="rounded border border-neutral-300 dark:border-neutral-700 px-1 py-0.5 text-xs"
 								onchange={(e) => e.currentTarget.form?.requestSubmit()}
 							>
 								{#each ['inbox', 'active', 'waiting', 'done'] as status (status)}
@@ -132,42 +138,42 @@
 				</tr>
 
 				{#if editing === task.id}
-					<tr class="border-t border-neutral-100 bg-neutral-50">
+					<tr class="border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900">
 						<td colspan="6" class="p-3">
 							<form method="POST" action="?/update" class="flex flex-wrap items-end gap-3">
 								<input type="hidden" name="taskId" value={task.id} />
 								<label class="block">
-									<span class="text-xs text-neutral-500">Title</span>
+									<span class="text-xs text-neutral-500 dark:text-neutral-400">Title</span>
 									<input
 										name="title"
 										value={task.title}
-										class="mt-1 rounded border border-neutral-300 px-2 py-1 text-sm"
+										class="mt-1 rounded border border-neutral-300 dark:border-neutral-700 px-2 py-1 text-sm"
 									/>
 								</label>
 								<label class="block">
-									<span class="text-xs text-neutral-500">Estimate (h)</span>
+									<span class="text-xs text-neutral-500 dark:text-neutral-400">Estimate (h)</span>
 									<input
 										name="estimateHours"
 										type="number"
 										step="0.25"
 										value={task.rawHours ?? ''}
-										class="mt-1 w-24 rounded border border-neutral-300 px-2 py-1 text-sm"
+										class="mt-1 w-24 rounded border border-neutral-300 dark:border-neutral-700 px-2 py-1 text-sm"
 									/>
 								</label>
 								<label class="block">
-									<span class="text-xs text-neutral-500">Deadline</span>
+									<span class="text-xs text-neutral-500 dark:text-neutral-400">Deadline</span>
 									<input
 										name="deadline"
 										type="datetime-local"
 										value={forInput(task.deadline)}
-										class="mt-1 rounded border border-neutral-300 px-2 py-1 text-sm"
+										class="mt-1 rounded border border-neutral-300 dark:border-neutral-700 px-2 py-1 text-sm"
 									/>
 								</label>
 								<label class="block">
-									<span class="text-xs text-neutral-500">Project</span>
+									<span class="text-xs text-neutral-500 dark:text-neutral-400">Project</span>
 									<select
 										name="projectId"
-										class="mt-1 rounded border border-neutral-300 px-2 py-1 text-sm"
+										class="mt-1 rounded border border-neutral-300 dark:border-neutral-700 px-2 py-1 text-sm"
 									>
 										<option value="">none</option>
 										{#each data.projects as project (project.id)}
@@ -179,21 +185,21 @@
 								</label>
 
 								<label class="block">
-									<span class="text-xs text-neutral-500">Not before</span>
+									<span class="text-xs text-neutral-500 dark:text-neutral-400">Not before</span>
 									<input
 										name="earliestStart"
 										type="datetime-local"
 										value={forInput(task.earliestStart)}
-										class="mt-1 rounded border border-neutral-300 px-2 py-1 text-sm"
+										class="mt-1 rounded border border-neutral-300 dark:border-neutral-700 px-2 py-1 text-sm"
 										title="The scheduler will not place this task before this moment — waiting on an asset, a brief, a delivery."
 									/>
 								</label>
 
 								<label class="block">
-									<span class="text-xs text-neutral-500">Wait for</span>
+									<span class="text-xs text-neutral-500 dark:text-neutral-400">Wait for</span>
 									<select
 										name="dependsOnTaskId"
-										class="mt-1 max-w-56 rounded border border-neutral-300 px-2 py-1 text-sm"
+										class="mt-1 max-w-56 rounded border border-neutral-300 dark:border-neutral-700 px-2 py-1 text-sm"
 										title="This task will never be placed before the one it waits for has finished."
 									>
 										<option value="">nothing</option>
@@ -206,10 +212,10 @@
 								</label>
 
 								<label class="block">
-									<span class="text-xs text-neutral-500">Smallest useful block</span>
+									<span class="text-xs text-neutral-500 dark:text-neutral-400">Smallest useful block</span>
 									<select
 										name="minBlockMinutes"
-										class="mt-1 rounded border border-neutral-300 px-2 py-1 text-sm"
+										class="mt-1 rounded border border-neutral-300 dark:border-neutral-700 px-2 py-1 text-sm"
 										title="A scheduler that chops modelling into 25-minute fragments produces a calendar that looks full and achieves nothing."
 									>
 										{#each [30, 60, 90, 120, 180, 240] as minutes (minutes)}
@@ -228,20 +234,20 @@
 								</label>
 
 								<label class="block">
-									<span class="text-xs text-neutral-500">Waiting on</span>
+									<span class="text-xs text-neutral-500 dark:text-neutral-400">Waiting on</span>
 									<input
 										name="waitingReason"
 										value={task.waitingReason ?? ''}
 										placeholder="client feedback"
-										class="mt-1 rounded border border-neutral-300 px-2 py-1 text-sm"
+										class="mt-1 rounded border border-neutral-300 dark:border-neutral-700 px-2 py-1 text-sm"
 									/>
 								</label>
 
-								<button class="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white">Save</button>
+								<button class="rounded bg-neutral-900 dark:bg-neutral-100 px-3 py-1.5 text-sm text-white dark:text-neutral-900">Save</button>
 							</form>
 							<form method="POST" action="?/remove" class="mt-2">
 								<input type="hidden" name="taskId" value={task.id} />
-								<button class="text-xs text-red-700 underline">Delete this task</button>
+								<button class="text-xs text-red-700 dark:text-red-400 underline">Delete this task</button>
 							</form>
 						</td>
 					</tr>
@@ -253,13 +259,13 @@
 
 <section class="mt-10">
 	<h2 class="font-medium">Projects</h2>
-	<p class="mt-1 text-sm text-neutral-600">
+	<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
 		Fees, currencies, agreed hours and hourly rates live on
 		<a class="underline" href="/projects">the projects page</a>.
 	</p>
 	<ul class="mt-2 flex flex-wrap gap-3 text-sm">
 		{#each data.projects as project (project.id)}
-			<li class="text-neutral-600">{project.name}</li>
+			<li class="text-neutral-600 dark:text-neutral-400">{project.name}</li>
 		{/each}
 	</ul>
 </section>

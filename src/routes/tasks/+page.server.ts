@@ -71,6 +71,7 @@ export const load: PageServerLoad = async (event) => {
 				splittable: task.splittable,
 				minBlockMinutes: task.minBlockMinutes,
 				projectName: task.projectId ? (projectById.get(task.projectId)?.name ?? null) : null,
+				projectColor: task.projectId ? (projectById.get(task.projectId)?.color ?? null) : null,
 				waitingReason: task.waitingReason,
 				// Raw and calibrated, always together. A silent multiplier destroys
 				// trust in the tool.
